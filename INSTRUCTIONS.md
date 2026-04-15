@@ -146,6 +146,8 @@ Only on `/implement`.
   - Large scope → work through several phases, pause after a meaningful chunk, then continue.
   - Explicit override: "stop after each phase" or "do it all".
 - **Update task tracker as you progress.**
+- Mention each task in one line before doing it.
+- Upon completing a phase, mention which phase completed and which is next in one line.
 - After each phase: re-read changed files, self-review (typos, logic, refs, imports, compatibility), self-correct before reporting.
 - **Lint if needed, only after completing a phase** — not after individual file changes.
 - Apply shared checklist.
