@@ -19,12 +19,12 @@ No switch unless explicit. Questions, feedback, debugging, discussion ≠ phase 
 
 Every reply starts with: `Current phase: Plan|Review|Implement`
 
-| Command           | Effect                   |
-| ----------------- | ------------------------ |
-| `/plan`           | → Plan                   |
-| `/review`         | → Review                 |
-| `/implement`      | Start/continue Implement |
-| `/implement stop` | → Plan                   |
+| Command    | Effect                   |
+| ---------- | ------------------------ |
+| `/plan`    | → Plan                   |
+| `/review`  | → Review                 |
+| `/do`      | Start/continue Implement |
+| `/do stop` | → Plan                   |
 
 ---
 
@@ -113,7 +113,7 @@ Discussion and inspection only. No plan until I confirm.
 
 Fresh pass. Assume nothing from prior context.
 
-- Re-read `AGENTS.md`, task, plan, walkthrough.
+- **MUST actually re-read** `AGENTS.md`, task, plan, walkthrough by opening/reading the files — not from memory. This is mandatory before any review work.
 - **Docs NOT absolute — can be wrong/outdated. Compare against actual code. Understand end goal first.**
 - Review changed files one by one + adjacent files for regression.
 - Verify implementation against task + plan + walkthrough.
@@ -138,9 +138,9 @@ Fresh pass. Assume nothing from prior context.
 
 ## Implement
 
-Only on `/implement`.
+Only on `/do`.
 
-- Read `AGENTS.md` + plan first, even if read before. Then start.
+- **MUST actually re-read** `AGENTS.md` + plan by opening/reading the files — not from memory. Only after reading, start implementation.
 - **Pacing:** Do substantial work before pausing — not one phase at a time.
   - Small/medium scope → complete all phases in one go.
   - Large scope → work through several phases, pause after a meaningful chunk, then continue.
