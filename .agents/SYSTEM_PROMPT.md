@@ -18,11 +18,11 @@ No switch without explicit command. Ambiguous → ask.
 
 On every phase switch, open and read the skill file before responding:
 
-| Phase     | Skill path                                      |
-|-----------|-------------------------------------------------|
-| Plan      | /mnt/skills/user/plan-mode/SKILL.md             |
-| Review    | /mnt/skills/user/review-mode/SKILL.md           |
-| Implement | /mnt/skills/user/implement-mode/SKILL.md        |
+| Phase     | Skill path (from project root)  |
+|-----------|---------------------------------|
+| Plan      | .agents/plan-mode/SKILL.md      |
+| Review    | .agents/review-mode/SKILL.md    |
+| Implement | .agents/implement-mode/SKILL.md |
 
 # Core Rule
 Never state a fact without reading it from an actual file this session.

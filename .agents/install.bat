@@ -21,9 +21,9 @@ set "IMPL_FWD=%IMPL_SKILL:\=/%"
 
 powershell -NoProfile -Command ^
   "(Get-Content '%AGENTS_DIR%\SYSTEM_PROMPT.md' -Raw)" ^
-  " -replace [regex]::Escape('/mnt/skills/user/plan-mode/SKILL.md'), '%PLAN_FWD%'" ^
-  " -replace [regex]::Escape('/mnt/skills/user/review-mode/SKILL.md'), '%REVIEW_FWD%'" ^
-  " -replace [regex]::Escape('/mnt/skills/user/implement-mode/SKILL.md'), '%IMPL_FWD%'" ^
+  " -replace [regex]::Escape('.agents/plan-mode/SKILL.md'), '%PLAN_FWD%'" ^
+  " -replace [regex]::Escape('.agents/review-mode/SKILL.md'), '%REVIEW_FWD%'" ^
+  " -replace [regex]::Escape('.agents/implement-mode/SKILL.md'), '%IMPL_FWD%'" ^
   " | Set-Content '%PATCHED%' -NoNewline"
 
 echo [OK] Skill paths resolved

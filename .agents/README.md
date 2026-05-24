@@ -32,14 +32,14 @@ Re-run any time you edit `SYSTEM_PROMPT.md`.
 | Antigravity | `.agent/rules/agent-skills.md` | Wrapped with `trigger: always_on` frontmatter |
 
 ## claude.ai (computer use)
-Skills need manual install — copy folders to `/mnt/skills/user/`:
+Skills need manual install — copy folders to root:
 ```
-plan-mode/     → /mnt/skills/user/plan-mode/
-review-mode/   → /mnt/skills/user/review-mode/
-implement-mode/ → /mnt/skills/user/implement-mode/
+plan-mode/      → .agents/plan-mode/
+review-mode/    → .agents/review-mode/
+implement-mode/ → .agents/implement-mode/
 ```
-Use `SYSTEM_PROMPT.md` as-is (paths already set for claude.ai).
+Use `SYSTEM_PROMPT.md` as-is.
 
 ## Editing the system prompt
 Edit `.agents/SYSTEM_PROMPT.md` only.
-Run `install.sh` after — it regenerates the patched files and refreshes all symlinks.
+Run `.agents/install.sh` after — it regenerates the patched files and refreshes all symlinks.
