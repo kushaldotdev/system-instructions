@@ -13,7 +13,26 @@ description: >
 ## Entry — always do this first
 1. Check context for `AGENTS.md [read]` marker. If absent → open `AGENTS.md` now.
 2. Check context for plan marker. If absent → open the plan now.
-3. Do not write a single line of code before both are loaded.
+3. Check the plan is solve-ready before editing.
+4. Do not write a single line of code before both are loaded and the plan is usable.
+
+### Plan Usability Gate
+
+Before editing, verify the plan includes:
+- exact files/functions/lines to change
+- ordered steps
+- edge cases
+- pitfalls / do not
+- validation/tests
+- docs impact
+- stop conditions
+
+If the plan is missing any of these for a risky change:
+- stop before editing
+- state what is missing
+- update the plan/doc first or ask for clarification
+
+Never improvise across an unclear BE/FE/docs contract.
 
 ## Read-Once Pattern
 After reading a file, mark it `[read]` in your reply. Do not re-open it unless:
@@ -28,9 +47,11 @@ drifts. One re-read before edit is mandatory; repeated re-reads mid-phase are no
 - **Large tasks** — meaningful chunks, pause after each, wait for go-ahead
   - Override: "stop after each phase" or "do it all"
 - One line per task before doing it
+- Follow the plan phase order; do not jump ahead unless the codebase proves the order is wrong
 - After each phase: re-read changed files, self-review, self-correct before reporting
 - Lint after each phase — not after individual files
 - Plan conflicts codebase → **stop immediately**. Never improvise. Surface the conflict.
+- If a fix reveals a broader contract issue, update the plan/doc before continuing.
 
 ---
 
@@ -56,6 +77,7 @@ drifts. One re-read before edit is mandatory; repeated re-reads mid-phase are no
 - No leftover logs / debug / hacks.
 - No unresolved TODO without approval.
 - Types complete. Edge cases covered.
+- Pitfalls from the plan are explicitly avoided.
 - Self-review before reporting done.
 
 ---
@@ -66,11 +88,25 @@ stale cache · broken imports/exports · config/env/schema mismatch · backward 
 missing validation/error handling/cleanup · loading/error/empty states · test gaps ·
 API contract · dead code/naming/complexity
 
+Also check:
+- edge cases listed in the plan
+- pitfalls / do-not items listed in the plan
+- docs updates listed in the plan
+- tests listed in the plan
+- final verification searches listed in the plan
+
 ---
 
 ## Done Criteria
 "Done" = all steps complete + self-reviewed + quality standards met + no open blockers.
 Never report done with unresolved issues. Surface them explicitly.
+
+Done also requires:
+- changed files re-read after edits
+- plan edge cases checked
+- plan pitfalls checked
+- validation commands run or explicitly reported as not run
+- docs updated when behavior/contracts changed
 
 ---
 
@@ -81,5 +117,9 @@ Never report done with unresolved issues. Surface them explicitly.
 ## Implemented
 ## Files changed
 ## Self-review
+## Edge cases checked
+## Pitfalls avoided
+## Validation
+## Docs updated
 ## Open issues / blockers
 ```

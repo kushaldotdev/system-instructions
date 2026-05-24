@@ -40,11 +40,32 @@ Every plan must be:
 - **Beginner-friendly** — exact file + function/line, exact changes, no "handle appropriately"
 - **Exhaustive** — every file, side effect, dependency. Nothing hand-waved.
 - **Ordered** — each step builds on the last
+- **Solve-ready** — includes edge cases, pitfalls, validation, docs, and rollback/stop conditions
 
-Per step format: `What · Where (file+fn/line) · How (exact) · Why · Caveats`
+Per step format: `What · Where (file+fn/line) · How (exact) · Why · Edge cases · Pitfalls / do not · Validation · Docs`
 
 ### 6. Gap Check
 Re-read plan vs task vs actual files. Fix vague/missing/risky steps. State what changed.
+
+Fail the gap check if any step:
+- says "handle appropriately", "update logic", "fix tests", or similar vague wording
+- lacks exact file/function targets
+- lacks edge cases for boundary-sensitive logic
+- lacks pitfalls for async, money, time, auth, cache, or API-contract changes
+- lacks validation/tests
+- changes behavior without docs impact analysis
+
+---
+
+## Audience Requirements
+
+Write for two readers:
+- **Regular engineer:** direct implementation path and tradeoffs.
+- **Beginner / low-context model:** exact order, exact files, do-not-do warnings, test commands.
+
+Plans must be usable without prior conversation context.
+If the task is complex, add a `Beginner Implementation Guide` section.
+If the task crosses BE/FE/docs, define the end-to-end contract before steps.
 
 ---
 
@@ -53,6 +74,13 @@ Null/empty/invalid input · boundary/off-by-one · auth/permissions · async/rac
 stale cache · broken imports/exports · config/env/schema mismatch · backward compatibility ·
 missing validation/error handling/cleanup · loading/error/empty states · test gaps ·
 API contract · dead code/naming/complexity
+
+Also include:
+- Edge cases
+- Pitfalls / do not
+- Final verification checklist
+- Required docs updates
+- Stop conditions when code and plan disagree
 
 ---
 
@@ -65,8 +93,29 @@ API contract · dead code/naming/complexity
 ## Inferred
 ## Unknown / needs clarification
 ## Edge cases / failure modes
+## Pitfalls / do not
 ## Issues / pushback
 ## Questions
+```
+
+### Plan output
+```
+# Implementation Plan
+## System / Contract Summary
+## Phase Order
+## Steps
+Each step:
+  What
+  Where
+  How
+  Why
+  Edge cases
+  Pitfalls / do not
+  Validation
+  Docs
+## Beginner Implementation Guide
+## Final Verification Checklist
+## Stop Conditions
 ```
 
 ### Post-plan gap check output
@@ -74,5 +123,7 @@ API contract · dead code/naming/complexity
 # Plan Gap Check
 ## Gaps / risks found
 ## Changes made
+## Remaining edge cases
+## Remaining pitfalls
 ## Open questions
 ```

@@ -40,13 +40,17 @@ State selected mode at the top of your reply, e.g.:
 The anchor is a compact project summary built from source files. It keeps the big picture
 in context during focused subsystem passes without loading full docs every time.
 
-Anchor location: `.agents/anchors/<project-name>.md`
-Where `<project-name>` is the root folder name of the project being reviewed.
+Anchor location:
+- Project-wide review: `.agents/anchors/<project-name>.md`
+- Focused subsystem review: `.agents/anchors/<project-name>-<subsystem-name>.md`
+
+Use a subsystem-specific anchor in large codebases when the user names a focused area
+(example: streaming, auth, reports, broker sync, frontend routing).
 
 ### Decision tree
 
 ```
-Does .agents/anchors/<project>.md exist?
+Does the correct project/subsystem anchor exist?
   NO  → run Anchor Build (below), then continue to Step 1
   YES → run Anchor Staleness Check (below)
           STALE   → run Anchor Partial Rebuild, then continue to Step 1
@@ -133,6 +137,40 @@ Check for:
 
 ---
 
+## Step 3: Solve-Ready Handoff
+
+For every non-nitpick issue, include enough information for a lower-context implementer to fix it
+without reading this conversation.
+
+Each issue must include:
+- **Problem** — exact observed behavior, with file + function/line
+- **Impact** — what breaks, corrupts, races, leaks, or misleads
+- **Root cause** — ownership/contract/code mismatch
+- **Solution** — ordered implementation steps, not just a recommendation
+- **Implementation shape** — small pseudocode/snippet when it prevents ambiguity
+- **Edge cases** — boundary cases the fix must handle
+- **Pitfalls / do not** — common wrong fixes to avoid
+- **Validation** — specific tests, commands, searches, or manual checks
+- **Docs** — docs that must be updated, if any
+
+If an issue crosses BE/FE/docs, state the end-to-end contract explicitly.
+If an identifier can be ambiguous, name the canonical routing/storage identifier.
+If previous docs are wrong, say they are wrong and cite actual code as source of truth.
+
+---
+
+## Audience Requirements
+
+Write for two readers:
+- **Regular engineer:** concise cause, impact, fix, tests.
+- **Beginner / low-context model:** exact files, exact order, edge cases, pitfalls, and stop conditions.
+
+Do not assume the reader remembers prior conversation.
+Do not write "handle appropriately", "update logic", "fix tests", or similar vague steps.
+Do not say an issue is solved by a local patch when the real contract spans multiple layers.
+
+---
+
 ## Mode A: Architecture Review
 
 **Goal:** Is the design sound? Are upstream/downstream relationships correct?
@@ -172,9 +210,11 @@ API contract · dead code/naming/complexity
 ## Anchor status (built / loaded / rebuilt)
 ## Subsystems reviewed
 ## Issues found per subsystem
-(subsystem · file · fn/line · exact problem · severity)
+(subsystem · file · fn/line · exact problem · impact · severity · solution)
 ## Seam issues (synthesis pass)
 ## Cross-cutting violations
+## Edge cases / pitfalls
+## Docs to update
 ## Verdict
 ```
 
@@ -185,10 +225,12 @@ API contract · dead code/naming/complexity
 ## Files checked
 ## Verified correct
 ## Issues found
-(file · fn/line · exact problem · why wrong · severity)
+(file · fn/line · exact problem · why wrong · severity · solution · validation)
 ## Seam issues (synthesis pass)
 ## Regression risks
 ## Nitpicks
+## Edge cases / pitfalls
+## Docs to update
 ## Verdict
 ```
 
@@ -200,5 +242,33 @@ Add a final section:
 # Combined Verdict
 ## Arch issues that affect code correctness
 ## Seam issues found in synthesis pass
+## Beginner implementation notes
+## Final verification checklist
 ## Overall recommendation
+```
+
+### Documentation / Remediation Plan output
+When the user asks to write or overwrite a review/remediation doc, use this shape:
+
+```
+# <Subsystem> Review And Remediation Plan
+## System Summary
+## Core Contracts
+## Previous Review Recheck
+## Active Issues And Solutions
+For each issue:
+  Severity
+  Files
+  Problem
+  Impact
+  Root cause
+  Solution
+  Implementation shape
+  Edge cases
+  Pitfalls / do not
+  Validation
+  Docs to update
+## Beginner Implementation Guide
+## Final Verification Checklist
+## Test Plan
 ```
