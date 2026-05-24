@@ -7,9 +7,9 @@ set "AGENTS_DIR=%~dp0"
 if "%AGENTS_DIR:~-1%"=="\" set "AGENTS_DIR=%AGENTS_DIR:~0,-1%"
 for %%A in ("%AGENTS_DIR%\..") do set "PROJECT_ROOT=%%~fA"
 
-set "PLAN_SKILL=%AGENTS_DIR%\plan-mode\SKILL.md"
-set "REVIEW_SKILL=%AGENTS_DIR%\review-mode\SKILL.md"
-set "IMPL_SKILL=%AGENTS_DIR%\implement-mode\SKILL.md"
+set "PLAN_SKILL=%AGENTS_DIR%\skills\plan\SKILL.md"
+set "REVIEW_SKILL=%AGENTS_DIR%\skills\review\SKILL.md"
+set "IMPL_SKILL=%AGENTS_DIR%\skills\implement\SKILL.md"
 set "PATCHED=%AGENTS_DIR%\.system_prompt_patched.md"
 set "ANTGRAV_WRAPPED=%AGENTS_DIR%\.system_prompt_antigravity.md"
 
@@ -21,9 +21,9 @@ set "IMPL_FWD=%IMPL_SKILL:\=/%"
 
 powershell -NoProfile -Command ^
   "(Get-Content '%AGENTS_DIR%\SYSTEM_PROMPT.md' -Raw)" ^
-  " -replace [regex]::Escape('.agents/plan-mode/SKILL.md'), '%PLAN_FWD%'" ^
-  " -replace [regex]::Escape('.agents/review-mode/SKILL.md'), '%REVIEW_FWD%'" ^
-  " -replace [regex]::Escape('.agents/implement-mode/SKILL.md'), '%IMPL_FWD%'" ^
+  " -replace [regex]::Escape('.agents/skills/plan/SKILL.md'), '%PLAN_FWD%'" ^
+  " -replace [regex]::Escape('.agents/skills/review/SKILL.md'), '%REVIEW_FWD%'" ^
+  " -replace [regex]::Escape('.agents/skills/implement/SKILL.md'), '%IMPL_FWD%'" ^
   " | Set-Content '%PATCHED%' -NoNewline"
 
 echo [OK] Skill paths resolved

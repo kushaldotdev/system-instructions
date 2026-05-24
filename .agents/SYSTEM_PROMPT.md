@@ -20,9 +20,9 @@ On every phase switch, open and read the skill file before responding:
 
 | Phase     | Skill path (from project root)  |
 |-----------|---------------------------------|
-| Plan      | .agents/plan-mode/SKILL.md      |
-| Review    | .agents/review-mode/SKILL.md    |
-| Implement | .agents/implement-mode/SKILL.md |
+| Plan      | .agents/skills/plan/SKILL.md      |
+| Review    | .agents/skills/review/SKILL.md    |
+| Implement | .agents/skills/implement/SKILL.md |
 
 # Core Rule
 Never state a fact without reading it from an actual file this session.
