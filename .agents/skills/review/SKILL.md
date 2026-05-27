@@ -138,6 +138,8 @@ Check for:
 ---
 
 ## Step 3: Solve-Ready Handoff
+- **File Output Mandatory**: Always write the full review findings to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`.
+- **No Review in Chat Context**: NEVER output the full review or details in the chat context. Only output the file path and a 1-2 sentence high-level summary.
 
 For every non-nitpick issue, include enough information for a lower-context implementer to fix it
 without reading this conversation.
@@ -204,7 +206,7 @@ API contract · dead code/naming/complexity
 
 ## Output Templates
 
-### Architecture Review output
+### Architecture Review output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
 ```
 # Architecture Review
 ## Anchor status (built / loaded / rebuilt)
@@ -218,7 +220,7 @@ API contract · dead code/naming/complexity
 ## Verdict
 ```
 
-### Code Review output
+### Code Review output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
 ```
 # Code Review
 ## Anchor status (built / loaded / rebuilt)
@@ -234,7 +236,7 @@ API contract · dead code/naming/complexity
 ## Verdict
 ```
 
-### Combined output (both modes)
+### Combined output (both modes) (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
 Run arch review block first, then code review block.
 Add a final section:
 
@@ -247,7 +249,7 @@ Add a final section:
 ## Overall recommendation
 ```
 
-### Documentation / Remediation Plan output
+### Documentation / Remediation Plan output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
 When the user asks to write or overwrite a review/remediation doc, use this shape:
 
 ```
@@ -271,4 +273,10 @@ For each issue:
 ## Beginner Implementation Guide
 ## Final Verification Checklist
 ## Test Plan
+```
+
+### Chat Context Output (Strictly Mandatory)
+```
+Review saved to: `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`
+Summary: <1-2 sentences high-level summary>
 ```
