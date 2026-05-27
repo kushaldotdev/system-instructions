@@ -137,9 +137,9 @@ Check for:
 
 ---
 
-## Step 3: Solve-Ready Handoff
-- **File Output Mandatory**: Always write the full review findings to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`.
-- **No Review in Chat Context**: NEVER output the full review or details in the chat context. Only output the file path and a 1-2 sentence high-level summary.
+## Step 3: Present Summary (before file write)
+- **Chat-first**: Present a summary in chat with bullet points. Cover: mode, files reviewed, key findings by severity, verdict. Enough to understand the review without reading the full file — not 1-2 sentences, not exhaustive detail.
+- **Ask to confirm**: After summary, ask user to confirm. If confirmed, ask them to switch to implement mode (`/do`). Do NOT write files from review mode.
 
 For every non-nitpick issue, include enough information for a lower-context implementer to fix it
 without reading this conversation.
@@ -206,7 +206,7 @@ API contract · dead code/naming/complexity
 
 ## Output Templates
 
-### Architecture Review output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
+### Architecture Review output (Written to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md` after mode switch)
 ```
 # Architecture Review
 ## Anchor status (built / loaded / rebuilt)
@@ -220,7 +220,7 @@ API contract · dead code/naming/complexity
 ## Verdict
 ```
 
-### Code Review output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
+### Code Review output (Written to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md` after mode switch)
 ```
 # Code Review
 ## Anchor status (built / loaded / rebuilt)
@@ -236,7 +236,7 @@ API contract · dead code/naming/complexity
 ## Verdict
 ```
 
-### Combined output (both modes) (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
+### Combined output (both modes) (Written to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md` after mode switch)
 Run arch review block first, then code review block.
 Add a final section:
 
@@ -249,7 +249,7 @@ Add a final section:
 ## Overall recommendation
 ```
 
-### Documentation / Remediation Plan output (Saved to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`)
+### Documentation / Remediation Plan output (Written to `.agents/review/YYYY-MM-DD-<brief-description-slug>.md` after mode switch)
 When the user asks to write or overwrite a review/remediation doc, use this shape:
 
 ```
@@ -275,8 +275,22 @@ For each issue:
 ## Test Plan
 ```
 
-### Chat Context Output (Strictly Mandatory)
+### Chat Summary Output
 ```
-Review saved to: `.agents/review/YYYY-MM-DD-<brief-description-slug>.md`
-Summary: <1-2 sentences high-level summary>
+## Review Summary
+- Mode: <code / arch / both>
+- Files: <count> checked across <subsystems>
+
+### Critical / Major
+- <issue 1> — <file:line>
+- <issue 2> — <file:line>
+
+### Minor / Nitpick
+- <issue 1>
+- <issue 2>
+
+### Verdict
+<pass / pass with issues / block>
+
+Want me to write the full review to `.agents/review/YYYY-MM-DD-<slug>.md`? Switch to implement mode (`/do`) and confirm.
 ```

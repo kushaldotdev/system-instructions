@@ -32,11 +32,11 @@ context. Only re-read if user says the file changed.
 Surface: contradictions, fragile areas, missing requirements, regression risks, ordering dependencies.
 
 ### 4. Ask
-Ask if user wants a plan. Do not write one until confirmed.
+Ask if user wants a plan. Do not present one until confirmed.
 
-### 5. Write Plan (after confirmation only)
-- **File Output Mandatory**: Always write the plan to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`.
-- **No Plan in Chat Context**: NEVER output the plan in the chat context. Only output the file path and a 1-2 sentence high-level summary.
+### 5. Present Summary (before file write)
+- **Chat-first**: Present a summary in chat with bullet points. Cover main points: what, where, approach, phases, key risks. Enough to understand the plan without reading the full file — not 1-2 sentences, not exhaustive detail.
+- **Ask to confirm**: After summary, ask user to confirm. If confirmed, ask them to switch to implement mode (`/do`). Do NOT write files from plan mode.
 - Every plan must be:
   - **Self-explanatory** — readable cold, zero prior context needed
   - **Beginner-friendly** — exact file + function/line, exact changes, no "handle appropriately"
@@ -48,7 +48,7 @@ Per step format: `What · Where (file+fn/line) · How (exact) · Why · Edge cas
 
 ### 6. Gap Check
 Re-read plan vs task vs actual files. Fix vague/missing/risky steps. State what changed.
-- **Append to File**: Always append the gap check results to the plan file in `.agents/plan/` and never output them in the chat context.
+- Runs after user confirms and switches to implement mode. Append results to plan file.
 
 Fail the gap check if any step:
 - says "handle appropriately", "update logic", "fix tests", or similar vague wording
@@ -101,7 +101,7 @@ Also include:
 ## Questions
 ```
 
-### Plan output (Saved to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`)
+### Plan output (Written to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md` after mode switch)
 ```
 # Implementation Plan
 ## System / Contract Summary
@@ -121,7 +121,7 @@ Each step:
 ## Stop Conditions
 ```
 
-### Post-plan gap check output (Appended to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`)
+### Post-plan gap check output (Appended to plan file after mode switch)
 ```
 # Plan Gap Check
 ## Gaps / risks found
@@ -131,8 +131,20 @@ Each step:
 ## Open questions
 ```
 
-### Chat Context Output (Strictly Mandatory)
+### Chat Summary Output
 ```
-Plan saved to: `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`
-Summary: <1-2 sentences high-level summary>
+## Plan Summary
+- What: <one line>
+- Where: <key files/modules>
+- Approach: <how we'll solve it>
+
+### Phases
+- Phase 1: <name> — <what>
+- Phase 2: <name> — <what>
+
+### Key Risks
+- <risk 1>
+- <risk 2>
+
+Want me to write the full plan to `.agents/plan/YYYY-MM-DD-<slug>.md`? Switch to implement mode (`/do`) and confirm.
 ```
