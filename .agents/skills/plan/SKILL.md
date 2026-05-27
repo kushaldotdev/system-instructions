@@ -35,17 +35,20 @@ Surface: contradictions, fragile areas, missing requirements, regression risks, 
 Ask if user wants a plan. Do not write one until confirmed.
 
 ### 5. Write Plan (after confirmation only)
-Every plan must be:
-- **Self-explanatory** — readable cold, zero prior context needed
-- **Beginner-friendly** — exact file + function/line, exact changes, no "handle appropriately"
-- **Exhaustive** — every file, side effect, dependency. Nothing hand-waved.
-- **Ordered** — each step builds on the last
-- **Solve-ready** — includes edge cases, pitfalls, validation, docs, and rollback/stop conditions
+- **File Output Mandatory**: Always write the plan to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`.
+- **No Plan in Chat Context**: NEVER output the plan in the chat context. Only output the file path and a 1-2 sentence high-level summary.
+- Every plan must be:
+  - **Self-explanatory** — readable cold, zero prior context needed
+  - **Beginner-friendly** — exact file + function/line, exact changes, no "handle appropriately"
+  - **Exhaustive** — every file, side effect, dependency. Nothing hand-waved.
+  - **Ordered** — each step builds on the last
+  - **Solve-ready** — includes edge cases, pitfalls, validation, docs, and rollback/stop conditions
 
 Per step format: `What · Where (file+fn/line) · How (exact) · Why · Edge cases · Pitfalls / do not · Validation · Docs`
 
 ### 6. Gap Check
 Re-read plan vs task vs actual files. Fix vague/missing/risky steps. State what changed.
+- **Append to File**: Always append the gap check results to the plan file in `.agents/plan/` and never output them in the chat context.
 
 Fail the gap check if any step:
 - says "handle appropriately", "update logic", "fix tests", or similar vague wording
@@ -98,7 +101,7 @@ Also include:
 ## Questions
 ```
 
-### Plan output
+### Plan output (Saved to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`)
 ```
 # Implementation Plan
 ## System / Contract Summary
@@ -118,7 +121,7 @@ Each step:
 ## Stop Conditions
 ```
 
-### Post-plan gap check output
+### Post-plan gap check output (Appended to `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`)
 ```
 # Plan Gap Check
 ## Gaps / risks found
@@ -126,4 +129,10 @@ Each step:
 ## Remaining edge cases
 ## Remaining pitfalls
 ## Open questions
+```
+
+### Chat Context Output (Strictly Mandatory)
+```
+Plan saved to: `.agents/plan/YYYY-MM-DD-<brief-description-slug>.md`
+Summary: <1-2 sentences high-level summary>
 ```
