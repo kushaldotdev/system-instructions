@@ -1,102 +1,34 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 
-:: ── Paths ────────────────────────────────────────────────────────────────────
-set "AGENTS_DIR=%~dp0"
-:: Remove trailing backslash
-if "%AGENTS_DIR:~-1%"=="\" set "AGENTS_DIR=%AGENTS_DIR:~0,-1%"
-for %%A in ("%AGENTS_DIR%\..") do set "PROJECT_ROOT=%%~fA"
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT=%SCRIPT_DIR%install.ps1"
 
-set "PLAN_SKILL=%AGENTS_DIR%\skills\plan\SKILL.md"
-set "REVIEW_SKILL=%AGENTS_DIR%\skills\review\SKILL.md"
-set "IMPL_SKILL=%AGENTS_DIR%\skills\implement\SKILL.md"
-set "PATCHED=%AGENTS_DIR%\.system_prompt_patched.md"
-set "ANTGRAV_WRAPPED=%AGENTS_DIR%\.system_prompt_antigravity.md"
-
-:: ── Patch skill paths ────────────────────────────────────────────────────────
-echo Patching skill paths...
-set "PLAN_FWD=%PLAN_SKILL:\=/%"
-set "REVIEW_FWD=%REVIEW_SKILL:\=/%"
-set "IMPL_FWD=%IMPL_SKILL:\=/%"
-
-powershell -NoProfile -Command ^
-  "(Get-Content '%AGENTS_DIR%\SYSTEM_PROMPT.md' -Raw)" ^
-  " -replace [regex]::Escape('.agents/skills/plan/SKILL.md'), '%PLAN_FWD%'" ^
-  " -replace [regex]::Escape('.agents/skills/review/SKILL.md'), '%REVIEW_FWD%'" ^
-  " -replace [regex]::Escape('.agents/skills/implement/SKILL.md'), '%IMPL_FWD%'" ^
-  " | Set-Content '%PATCHED%' -NoNewline"
-
-echo [OK] Skill paths resolved
-echo.
-
-:: ── Helper macro — call :deploy src dst ──────────────────────────────────────
-goto :main
-
-:deploy
-  set "SRC=%~1"
-  set "DST=%~2"
-  for %%D in ("%DST%\..") do mkdir "%%~fD" 2>nul
-  if exist "%DST%" (
-    move /Y "%DST%" "%DST%.bak" >nul
-    echo    backed up: %DST%.bak
-  )
-  copy /Y "%SRC%" "%DST%" >nul
-  echo    [OK] %DST%
-goto :eof
-
-:main
-
-:: ── Claude Code ───────────────────────────────────────────────────────────────
-echo -- Claude Code
-call :deploy "%PATCHED%" "%PROJECT_ROOT%\CLAUDE.md"
-
-:: ── Cline ─────────────────────────────────────────────────────────────────────
-echo.
-echo -- Cline
-call :deploy "%PATCHED%" "%PROJECT_ROOT%\.cline\rules\agent-skills.md"
-
-:: ── Kilocode ──────────────────────────────────────────────────────────────────
-echo.
-echo -- Kilocode
-call :deploy "%PATCHED%" "%PROJECT_ROOT%\.kilo\rules\agent-skills.md"
-
-set "KILO_JSON=%PROJECT_ROOT%\kilo.jsonc"
-if not exist "%KILO_JSON%" (
-  echo { "instructions": [".kilo/rules/agent-skills.md"] } > "%KILO_JSON%"
-  echo    [OK] created kilo.jsonc
-) else (
-  findstr /C:"agent-skills.md" "%KILO_JSON%" >nul 2>&1
-  if !errorlevel!==0 (
-    echo    [OK] kilo.jsonc already references agent-skills.md
-  ) else (
-    powershell -NoProfile -Command ^
-      "$c = Get-Content '%KILO_JSON%' -Raw;" ^
-      "if ($c -match '\"instructions\"') {" ^
-      "  $c = $c -replace '\"instructions\"\s*:\s*\[', '\"instructions\": [\".kilo/rules/agent-skills.md\", ';" ^
-      "} else {" ^
-      "  $c = $c -replace '}\s*$', ', \"instructions\": [\".kilo/rules/agent-skills.md\"]}';" ^
-      "}" ^
-      "Set-Content '%KILO_JSON%' $c -NoNewline"
-    echo    [OK] updated kilo.jsonc
-  )
+if not exist "%SCRIPT%" (
+    echo ERROR: install.ps1 not found at %SCRIPT%
+    pause
+    exit /b 1
 )
 
-:: ── Antigravity ───────────────────────────────────────────────────────────────
-echo.
-echo -- Antigravity
-(
-  echo ---
-  echo trigger: always_on
-  echo ---
-  echo.
-  type "%PATCHED%"
-) > "%ANTGRAV_WRAPPED%"
+set "PS="
+if exist "%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\powershell.exe" (
+    set "PS=%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\powershell.exe"
+    goto run
+)
+where pwsh.exe >nul 2>&1
+if not errorlevel 1 (
+    set "PS=pwsh.exe"
+    goto run
+)
+echo ERROR: PowerShell not found.
+pause
+exit /b 1
 
-call :deploy "%ANTGRAV_WRAPPED%" "%PROJECT_ROOT%\.agent\rules\agent-skills.md"
+:run
+set "ARGS=%*"
+set "ARGS=%ARGS:--global=-Global%"
+set "ARGS=%ARGS:--project=-Project%"
+"%PS%" -ExecutionPolicy Bypass -File "%SCRIPT%" %ARGS%
 
-:: ── Done ──────────────────────────────────────────────────────────────────────
-echo.
-echo All done.
-echo Re-run this file after editing SYSTEM_PROMPT.md
 echo.
 pause

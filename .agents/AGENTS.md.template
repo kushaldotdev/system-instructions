@@ -1,0 +1,20 @@
+# Project: <name>
+
+## Stack
+<languages, frameworks, versions>
+
+## Commands
+Build: <command>
+Test: <command> (must pass before commits)
+Lint: <command>
+
+## Structure
+<src/ layout, key directories>
+
+## Conventions
+<Naming, patterns, preferences>
+
+## Boundaries
+- Always: <run tests, follow style>
+- Ask first: <schema changes, new deps>
+- Never: <commit secrets, edit vendor/>

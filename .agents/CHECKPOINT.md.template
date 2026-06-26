@@ -1,0 +1,28 @@
+# Checkpoint: <slug>
+
+## Plan
+`.agents/plan/YYYY-MM-DD-<slug>.md`
+
+## Goal
+<what the session is trying to achieve>
+
+## Current State
+<what works, what doesn't, what is half-done>
+
+## Files Changed
+`file:line` -- <change summary>
+
+## Open Bugs / Issues
+<bullet list>
+
+## Key Decisions
+<bullet list>
+
+## Unresolved Questions
+<bullet list>
+
+## Remaining Work
+<bullet list in priority order>
+
+## Next Step
+<exactly what the resuming AI should do first -- file, line, action>
