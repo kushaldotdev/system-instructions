@@ -1,17 +1,16 @@
 # Plan Framework
 
 ## Steps (ordered -- never skip, never reorder)
-0. Interview user for intent. Ask clarifying questions about goal, scope, and requirements. Understand the full picture before planning.
-1. Read AGENTS.md + relevant source files. Not from memory.
-2. Map dependency graph: every file changed -> every file that depends on it.
-3. Order by risk: highest-uncertainty changes first (fail fast).
-4. Define interface contracts before touching any implementation.
-5. For each phase: specify rollback strategy.
-6. Present summary in chat. Bullet points: what, where, approach, phases, key risks.
-7. Ask for confirmation. Do NOT write plan file until confirmed.
-8. On confirmation + /do: write full plan to `.agents/plan/YYYY-MM-DD-<slug>.md`.
-   Then gap-check: re-read plan vs task vs files. Fix vague/missing/risky steps before implement begins.
-9. If session is large (~50 turns): offer checkpoint before switching to Implement.
+0. Interview: clarify goal, scope, requirements. Understand fully before planning.
+1. Read AGENTS.md + source files. Not from memory.
+2. Map dependency graph: every file changed -> every dependent.
+3. Order by risk: highest uncertainty first (fail fast).
+4. Define contracts before any implementation.
+5. Each phase: specify rollback.
+6. Present summary: what, where, approach, phases, risks.
+7. Ask confirmation. Don't write plan file until confirmed.
+8. On /do: write `.agents/plan/YYYY-MM-DD-<slug>.md`. Gap-check: re-read plan vs task vs files. Fix vague/missing/risky steps.
+9. At ~50 turns: offer checkpoint before Implement.
 
 ## Output Template
 ```
@@ -24,19 +23,17 @@ Phase N: <files> <exact changes> <risks> <rollback>
 ```
 
 ## Decision Records
-Before significant design decisions:
-- List 2+ viable alternatives with pros/cons.
-- State why chosen approach is preferred.
-- Note what would change the decision.
-- 3-5 sentences max. Do not over-document.
+Before significant decisions:
+- List 2+ alternatives with pros/cons. State why chosen. Note what changes decision.
+- 3-5 sentences max. Don't over-document.
 
 # Review Heuristics
 
 ## Multi-Pass (run in sequence)
-Pass 1 -- **Architecture**: Design sound? Layer violations? Contract mismatches?
-Pass 2 -- **Data Flow**: Trace input -> transformation -> output. Data integrity preserved?
-Pass 3 -- **Error Paths**: Every return that could be null/error/empty. What reaches the user? What leaks resources?
-Pass 4 -- **Security**: Untrusted input paths. Auth at every boundary. Injection vectors.
+Pass 1 -- **Architecture**: Sound? Layer violations? Contract mismatches?
+Pass 2 -- **Data Flow**: Input->transform->output. Data integrity preserved?
+Pass 3 -- **Error Paths**: Every null/error/empty return. What reaches user? Leaks resources?
+Pass 4 -- **Security**: Untrusted input paths. Auth at boundaries. Injection vectors.
 Pass 5 -- **Readability**: First-time reader test. Confusing names? Missing context?
 
 ## Perspectives (apply to every pass)
@@ -106,7 +103,6 @@ Pass N: <finding> | <file:line> | <severity: critical/major/minor>
 6. Check log/error messages -- useful or noise?
 
 ## Testing Guidance
-- PHP: PHPUnit. Test public API; cover input/output contracts.
 - Python: pytest. Parametrize edge cases; test error paths.
 - JavaScript/TypeScript: vitest/jest. Type narrow before runtime test.
 - React: Testing Library. Test behavior, not implementation.

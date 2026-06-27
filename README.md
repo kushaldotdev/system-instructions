@@ -19,15 +19,18 @@ During installation, you choose the **instructions format**:
 
 | Format | Files | Token cost |
 |--------|-------|------------|
-| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | ~600t always + ~1,100t on-demand |
-| **Standalone** | `INSTRUCTIONS.md` (merged) | ~1,700t always loaded |
+| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | ~540t always + ~1,320t on-demand |
+| **Standalone** | `INSTRUCTIONS.md` (merged) | ~1,980t always loaded |
 
 ## Structure
 
 ```
 .agents/
-  SYSTEM_PROMPT.md          <- always-loaded rules (role, caveman, phase control, context budget)
-  RULES.md                  <- loaded on-demand for Plan/Review (heuristics, gotchas, templates)
+  SYSTEM_PROMPT.md          <- always-loaded rules (role, caveman, phase control, rules,
+  |                             context budget, tools/MCP, phase details, subagents, complex tasks)
+  RULES.md                  <- loaded on-demand for Plan/Review (plan framework, decision records,
+  |                             review heuristics, debugging, self-review, testing, refactoring,
+  |                             commit hygiene)
   CHECKPOINT.md.template    <- session checkpoint template (context overflow recovery)
   AGENTS.md.template        <- scaffold for project-specific context
   install.sh                <- Unix installer
@@ -70,11 +73,11 @@ Creates bridge files inside a project directory. Tools already configured global
 
 | File | When loaded | Token cost |
 |------|-------------|------------|
-| SYSTEM_PROMPT.md | session start | ~600 |
-| RULES.md | first Plan or Review action | ~1,100 (one time) |
+| SYSTEM_PROMPT.md | session start | ~540 |
+| RULES.md | first Plan or Review action | ~1,320 (one time) |
 | CHECKPOINT.md.template | on checkpoint trigger (context overflow) | ~200 (one time per checkpoint) |
 | Project AGENTS.md | session start | project-dependent |
-| **Total** | | **~1,700 + project context** |
+| **Total** | | **~1,860 + project context** |
 
 ## Checkpoint System
 
