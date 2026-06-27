@@ -28,6 +28,7 @@ exit /b 1
 set "ARGS=%*"
 set "ARGS=%ARGS:--global=-Global%"
 set "ARGS=%ARGS:--project=-Project%"
+set "ARGS=%ARGS:--force=-Force%"
 "%PS%" -ExecutionPolicy Bypass -File "%SCRIPT%" %ARGS%
 
 echo.

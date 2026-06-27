@@ -12,12 +12,14 @@ CHECKPOINT_TEMPLATE="$CENTRAL_ROOT/.agents/CHECKPOINT.md.template"
 MODE=""
 PROJECT_DIR=""
 NO_PAUSE=false
+FORCE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --global) MODE="global"; shift ;;
     --project) MODE="project"; shift; PROJECT_DIR="${1:-}"; [ -z "$PROJECT_DIR" ] && { echo "Usage: --project <dir>"; exit 1; }; shift ;;
     --no-pause) NO_PAUSE=true; shift ;;
-    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>]"; exit 0 ;;
+    --force) FORCE=true; shift ;;
+    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>] [--force] [--no-pause]"; exit 0 ;;
     *) echo "Unknown: $1"; exit 1 ;;
   esac
 done
@@ -118,54 +120,42 @@ is_globally_installed() {
   [ -f "$f" ] || [ -L "$f" ]
 }
 
-# === Write instruct bridge ===
+# === Write instruct bridge (direct write for single-file tools) ===
 write_instruct_bridge() {
   local file="$1"
   local label="$2"
   local dir="$(dirname "$file")"
   mkdir -p "$dir"
 
-  # Always copy/update support files (no early return -- needed for updates)
-  if [ "$FORMAT" = "modular" ]; then
-    cp -f "$SYSP" "$dir/SYSTEM_PROMPT.md"
-    cp -f "$RULES" "$dir/RULES.md"
-    cp -f "$CHECKPOINT_TEMPLATE" "$dir/CHECKPOINT.md.template"
-    sed -i "s|\\.agents/RULES\\.md|$dir/RULES.md|g" "$dir/SYSTEM_PROMPT.md"
-    sed -i "s|\\.agents/CHECKPOINT\\.md\\.template|$dir/CHECKPOINT.md.template|g" "$dir/SYSTEM_PROMPT.md"
-  else
-    cp -f "$INST" "$dir/INSTRUCTIONS.md"
-  fi
-
-  # Skip bridge write if already configured (preserves user content)
+  # Check existing file (preserve custom content unless --force)
   if [ -f "$file" ]; then
     read -r first_line < "$file"
     first_line="${first_line#$'\xef\xbb\xbf'}"
-    if [ "$first_line" = "# AI Behavior Rules" ]; then
-      echo "    [exists] $file (already configured)"
+    if [ "$first_line" != "# AI Behavior Rules" ] && [ "$FORCE" != true ]; then
+      echo "    [skip]  $file (custom content exists, use --force to overwrite)"
       return
     fi
   fi
 
   if [ "$FORMAT" = "modular" ]; then
-    cat > "$file" <<-BRIDGE
-# AI Behavior Rules
-Read and follow these files for all behavior, review, and planning rules:
-  - $dir/SYSTEM_PROMPT.md
-  - $dir/RULES.md
-These override any implicit behavior.
-
-# $label
-BRIDGE
+    # Copy RULES.md and CHECKPOINT.md.template (not SYSTEM_PROMPT.md -- it IS the file)
+    cp -f "$RULES" "$dir/RULES.md"
+    cp -f "$CHECKPOINT_TEMPLATE" "$dir/CHECKPOINT.md.template"
+    # Write SYSP content with marker header + path substitution
+    { echo "# AI Behavior Rules"
+      sed -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
+          -e "s|\.agents/CHECKPOINT\.md\.template|$dir/CHECKPOINT.md.template|g" \
+          "$SYSP"
+    } > "$file"
   else
-    cat > "$file" <<-BRIDGE
-# AI Behavior Rules
-Read and follow $dir/INSTRUCTIONS.md for all behavior, review, and planning rules.
-These override any implicit behavior.
-
-# $label
-BRIDGE
+    # Write INST content with marker header (fully self-contained)
+    { echo "# AI Behavior Rules"
+      cat "$INST"
+    } > "$file"
   fi
   echo "    [write] $file"
+  # Clean up any old SYSTEM_PROMPT.md copy that is no longer needed
+  rm -f "$dir/SYSTEM_PROMPT.md" 2>/dev/null || true
 }
 
 jsonc_instructions() {
@@ -506,7 +496,7 @@ echo ""
 echo "=== Done ==="
 echo "  Format: $FORMAT ($INSTR_TEXT)"
 if [ "$MODE" = "global" ] || [ "$MODE" = "both" ]; then
-  echo "  Global: bridges installed. Re-run to refresh: $SCRIPT_DIR/install.sh --global"
+  echo "  Global: bridges installed. Re-run to refresh: $SCRIPT_DIR/install.sh --global [--force]"
 fi
 if [ "$MODE" = "project" ] || [ "$MODE" = "both" ]; then
   echo "  Project: bridges in $PROJECT_DIR"

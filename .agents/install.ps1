@@ -1,7 +1,8 @@
 #Requires -Version 5.1
 param(
     [switch]$Global,
-    [string]$Project
+    [string]$Project,
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -110,47 +111,32 @@ Function Write-InstructBridge {
     $dir = Split-Path $File -Parent
     New-Item -Path $dir -ItemType Directory -Force | Out-Null
 
-    # Always copy/update support files (no early return -- needed for updates)
-    if ($Format -eq 'modular') {
-        Copy-Item -Path $Sysp -Destination "$dir\SYSTEM_PROMPT.md" -Force
-        Copy-Item -Path $Rules -Destination "$dir\RULES.md" -Force
-        Copy-Item -Path $CheckpointTemplate -Destination "$dir\CHECKPOINT.md.template" -Force
-        (Get-Content "$dir\SYSTEM_PROMPT.md" -Raw) -replace '\.agents/RULES\.md', "$dir\RULES.md" | Set-Content "$dir\SYSTEM_PROMPT.md" -NoNewline
-        (Get-Content "$dir\SYSTEM_PROMPT.md" -Raw) -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template" | Set-Content "$dir\SYSTEM_PROMPT.md" -NoNewline
-    } else {
-        Copy-Item -Path $Inst -Destination "$dir\INSTRUCTIONS.md" -Force
-    }
-
-    # Skip bridge write if already configured (preserves user content)
+    # Check existing file (preserve custom content unless -Force)
     if (Test-Path -Path $File -PathType Leaf) {
         $firstLine = Get-Content -Path $File -First 1
-        if ($firstLine -eq '# AI Behavior Rules') {
-            Write-Host "    [exists] $File (already configured)"
+        if ($firstLine -ne '# AI Behavior Rules' -and -not $Force) {
+            Write-Host "    [skip]  $File (custom content exists, use -Force to overwrite)"
             return
         }
     }
 
     if ($Format -eq 'modular') {
-        $content = @"
-# AI Behavior Rules
-Read and follow these files for all behavior, review, and planning rules:
-  - $dir\SYSTEM_PROMPT.md
-  - $dir\RULES.md
-These override any implicit behavior.
-
-# $Label
-"@
+        # Copy RULES.md and CHECKPOINT.md.template (not SYSTEM_PROMPT.md -- it IS the file)
+        Copy-Item -Path $Rules -Destination "$dir\RULES.md" -Force
+        Copy-Item -Path $CheckpointTemplate -Destination "$dir\CHECKPOINT.md.template" -Force
+        # Write SYSP content with marker header + path substitution
+        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Sysp -Raw) -replace '\.agents/RULES\.md', "$dir\RULES.md")
+        $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template"
+        Set-Content -Path $File -Value $content -Encoding UTF8
     } else {
-        $content = @"
-# AI Behavior Rules
-Read and follow $dir\INSTRUCTIONS.md for all behavior, review, and planning rules.
-These override any implicit behavior.
-
-# $Label
-"@
+        # Write INST content with marker header (fully self-contained)
+        $content = "# AI Behavior Rules`r`n" + (Get-Content -Path $Inst -Raw)
+        Set-Content -Path $File -Value $content -Encoding UTF8
     }
-    Set-Content -Path $File -Value $content -Encoding UTF8
     Write-Host "    [write] $File"
+    # Clean up any old SYSTEM_PROMPT.md copy that is no longer needed
+    $old = Join-Path $dir 'SYSTEM_PROMPT.md'
+    if (Test-Path -Path $old) { Remove-Item -Path $old -Force }
 }
 
 Function Write-JsoncConfig {
