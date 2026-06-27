@@ -19,8 +19,8 @@ During installation, you choose the **instructions format**:
 
 | Format | Files | Token cost |
 |--------|-------|------------|
-| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | ~540t always + ~1,320t on-demand |
-| **Standalone** | `INSTRUCTIONS.md` (merged) | ~1,980t always loaded |
+| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | ~590t always + ~1,300t on-demand |
+| **Standalone** | `INSTRUCTIONS.md` (merged) | ~2,030t always loaded |
 
 ## Structure
 
@@ -73,11 +73,11 @@ Creates bridge files inside a project directory. Tools already configured global
 
 | File | When loaded | Token cost |
 |------|-------------|------------|
-| SYSTEM_PROMPT.md | session start | ~540 |
-| RULES.md | first Plan or Review action | ~1,320 (one time) |
+| SYSTEM_PROMPT.md | session start | ~590 |
+| RULES.md | first Plan or Review action | ~1,300 (one time) |
 | CHECKPOINT.md.template | on checkpoint trigger (context overflow) | ~200 (one time per checkpoint) |
 | Project AGENTS.md | session start | project-dependent |
-| **Total** | | **~1,860 + project context** |
+| **Total** | | **~1,890 + project context** |
 
 ## Checkpoint System
 
