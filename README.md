@@ -88,6 +88,17 @@ When a session context grows large (~50 turns), after completing changes, or aft
 
 Checkpoints include: goal, current state, files changed, open bugs, key decisions, remaining work, and the exact next step. The template is copied alongside SYSTEM_PROMPT.md at install time.
 
+## LSP Support
+
+The installer prompts whether to enable **LSP (Language Server Protocol)** for opencode.
+
+| Setting | Effect |
+|---------|--------|
+| LSP enabled | `"lsp": true` added to `opencode.jsonc`. OpenCode auto-detects and starts language servers (TypeScript, Python, HTML, CSS, Go, Rust, etc.) when matching files are opened. Diagnostics are fed back to the agent. |
+| LSP disabled (default) | No LSP config. Agent uses grep/read for code navigation. Saves ~small token overhead. |
+
+**Token impact**: LSP adds diagnostic messages to context when reading files. Near-zero for clean codebases. Tens to low hundreds of tokens for error-heavy files.
+
 ## Updating Rules
 
 Edit central files, then re-run the installer:

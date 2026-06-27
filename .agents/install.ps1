@@ -86,6 +86,14 @@ switch -regex ($fmt) {
     default { Write-Host "Invalid"; exit 1 }
 }
 
+# --- LSP for opencode ---
+Write-Host ""
+Write-Host "Enable LSP for opencode? (y/N):"
+Write-Host "  LSP provides diagnostics and symbol intelligence when reading files."
+Write-Host "  Note: adds small token overhead (diagnostic messages per file)."
+$lspInput = Read-Host "Choice (y/N)"
+if ($lspInput -match '^[yY]') { $LspEnabled = $true } else { $LspEnabled = $false }
+
 # --- tool selection ---
 Write-Host ""
 Write-Host "Select tools to configure (comma-separated, a for all):"
@@ -140,7 +148,7 @@ Function Write-InstructBridge {
 }
 
 Function Write-JsoncConfig {
-    param([string]$Target, [string]$Filename, [string]$Label)
+    param([string]$Target, [string]$Filename, [string]$Label, [bool]$AddLsp = $false)
     $json = Join-Path -Path $Target -ChildPath $Filename
 
     $syspDest = Join-Path -Path $Target -ChildPath 'SYSTEM_PROMPT.md'
@@ -261,6 +269,21 @@ Function Write-JsoncConfig {
             }
         }
 
+        # --- fix lsp for opencode ---
+        if ($AddLsp -and -not ($content -match '"lsp"\s*:\s*true')) {
+            $permStart = $content.IndexOf('"permission"')
+            if ($permStart -ge 0) {
+                $before = $content.Substring(0, $permStart).TrimEnd()
+                $after = $content.Substring($permStart)
+                if ($before -match ',$') {
+                    $content = $before + "`n  `"lsp`": true,`n  " + $after
+                } else {
+                    $content = $before + ",`n  `"lsp`": true,`n  " + $after
+                }
+                $changed = $true
+            }
+        }
+
         if ($changed) {
             Set-Content -Path $json -Value $content -Encoding UTF8
             Write-Host "    [update] $json"
@@ -268,10 +291,11 @@ Function Write-JsoncConfig {
             Write-Host "    [ok]     $json"
         }
     } else {
+        $lspLine = if ($AddLsp) { "`n  `"lsp`": true," } else { "" }
         $content = "{
   `"instructions`": [
     $localQuoted
-  ],
+  ],$lspLine
   `"permission`": {
     `"read`": {
       `"$permPathFwd`": `"allow`""
@@ -341,7 +365,7 @@ Function Install-GlobalTool {
         1 {
             Write-Host "  -- opencode (global)"
             New-DirectoryIfMissing -Path "$HomeDir\.config\opencode"
-            Write-JsoncConfig -Target "$HomeDir\.config\opencode" -Filename "opencode.jsonc" -Label "global"
+            Write-JsoncConfig -Target "$HomeDir\.config\opencode" -Filename "opencode.jsonc" -Label "global" -AddLsp $LspEnabled
         }
         2 {
             Write-Host "  -- claude-code (global)"
@@ -383,7 +407,7 @@ Function Install-ProjectTool {
     switch ($ToolNum) {
         1 {
             Write-Host "  -- opencode (project)"
-            Write-JsoncConfig -Target $Target -Filename "opencode.jsonc" -Label "project"
+            Write-JsoncConfig -Target $Target -Filename "opencode.jsonc" -Label "project" -AddLsp $LspEnabled
         }
         2 {
             Write-Host "  -- claude-code (project)"
@@ -427,4 +451,6 @@ Write-Host "  Done!"
 if ($runGlobal) { Write-Host "  Global bridges installed" }
 if ($runProject) { Write-Host "  Project bridges in $ProjectDir" }
 Write-Host "  Format: $Format"
+$lspStatus = if ($LspEnabled) { "enabled for opencode" } else { "disabled" }
+Write-Host "  LSP: $lspStatus"
 Write-Host "========================="

@@ -97,6 +97,17 @@ case "$fmt" in
   *) echo "Invalid"; exit 1 ;;
 esac
 
+# === LSP for opencode ===
+echo ""
+echo "Enable LSP for opencode? (y/N):"
+echo "  LSP provides diagnostics and symbol intelligence when reading files."
+echo "  Note: adds small token overhead (diagnostic messages per file)."
+read -p "Choice (y/N): " lsp_choice
+case "$lsp_choice" in
+  y|Y|yes|Yes) LSP_ENABLED=true ;;
+  *) LSP_ENABLED=false ;;
+esac
+
 # === Global detection ===
 global_path_for_tool() {
   case "$1" in
@@ -162,6 +173,7 @@ jsonc_instructions() {
   local target="$1"
   local filename="$2"
   local label="$3"
+  local add_lsp="${4:-false}"
   local json="$target/$filename"
 
   cp -f "$SYSP" "$target/SYSTEM_PROMPT.md"
@@ -332,6 +344,18 @@ jsonc_instructions() {
       changed=true
     fi
 
+    # --- fix lsp for opencode ---
+    if [ "$add_lsp" = true ] && ! grep -q '"lsp"' "$json" 2>/dev/null; then
+      awk '
+        /^[[:space:]]*"permission"/ {
+          print "  \"lsp\": true,"
+          print; next
+        }
+        { print }
+      ' "$json" > "$tmp" && mv "$tmp" "$json"
+      changed=true
+    fi
+
     if [ "$changed" = true ]; then
       echo "    [update] $json"
     else
@@ -339,22 +363,25 @@ jsonc_instructions() {
     fi
   else
     local ext_dir_json=""
+    local lsp_json=""
     if [ -n "$ext_dir_pattern" ]; then
       ext_dir_json=",
     \"external_directory\": {
       \"$ext_dir_pattern\": \"allow\"
     }"
     fi
+    if [ "$add_lsp" = true ]; then
+      lsp_json=$'\n  "lsp": true,'
+    fi
     cat > "$json" <<-EOF
 {
   "instructions": [
     $sysp_quoted
-  ],
+  ],$lsp_json
   "permission": {
     "read": {
       "$perm_path": "allow"
     }$ext_dir_json
-    }
   }
 }
 EOF
@@ -398,7 +425,7 @@ global_install() {
     1)
       echo "  -- opencode (global)"
       mkdir -p "$HOME/.config/opencode"
-      jsonc_instructions "$HOME/.config/opencode" "opencode.jsonc" "global"
+      jsonc_instructions "$HOME/.config/opencode" "opencode.jsonc" "global" "$LSP_ENABLED"
       ;;
     2)
       echo "  -- claude-code (global)"
@@ -454,7 +481,7 @@ project_install() {
   case "$sel" in
     1)
       echo "  -- opencode (project)"
-      jsonc_instructions "$target" "opencode.jsonc" "project"
+      jsonc_instructions "$target" "opencode.jsonc" "project" "$LSP_ENABLED"
       ;;
     2)
       echo "  -- claude-code (project)"
@@ -495,6 +522,7 @@ done
 echo ""
 echo "=== Done ==="
 echo "  Format: $FORMAT ($INSTR_TEXT)"
+echo "  LSP: $([ "$LSP_ENABLED" = true ] && echo "enabled for opencode" || echo "disabled")"
 if [ "$MODE" = "global" ] || [ "$MODE" = "both" ]; then
   echo "  Global: bridges installed. Re-run to refresh: $SCRIPT_DIR/install.sh --global [--force]"
 fi
