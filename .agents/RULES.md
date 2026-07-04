@@ -8,8 +8,8 @@
 4. Define contracts before any implementation.
 5. Each phase: specify rollback.
 6. Present summary: what, where, approach, phases, risks.
-7. Ask confirmation. Don't write plan file until confirmed.
-8. On /do: write `.agents/plan/YYYY-MM-DD-<slug>.md`. Gap-check: re-read plan vs task vs files. Fix vague/missing/risky steps.
+7. Ask confirmation. Ask whether the user wants a persisted plan file or implementation only.
+8. On /do: implement unless the user explicitly requested a plan file. Write `.agents/plan/YYYY-MM-DD-<slug>.md` only on explicit request. Gap-check: re-read plan/intent vs task vs files. Fix vague/missing/risky steps.
 9. At ~50 turns: offer checkpoint before Implement.
 
 ## Output Template
@@ -26,6 +26,17 @@ Phase N: <files> <exact changes> <risks> <rollback>
 Before significant decisions:
 - List 2+ alternatives with pros/cons. State why chosen. Note what changes decision.
 - 3-5 sentences max. Don't over-document.
+
+## Plan Robustness Rules
+- Split oversized phases. If one phase is larger than the rest combined, split it. Each phase should be completable and committable in 1-3 days.
+- For risky phases touching multiple existing implementations, add `Critical Hints` with 3-5 files/concepts to read first.
+- For risky phases, add `Anti-Patterns -- Do NOT` with 3-5 likely mistakes to avoid.
+- Prefer concrete contracts over prose. Pick exact threshold values, field names, type names, nullability, and data shapes.
+- Define contracts before implementation. For new APIs or shared types, include the actual schema/interface/type/DTO used by the project stack.
+- For migrations, specify rollback behavior. Test downgrade/rollback, state what it reverses, and note whether backfilled data needs cleanup.
+- Do not plan a consumer without its producer. UI, CLI, workers, or integrations that depend on data must be planned with the producing API/event/file/job in the same or earlier phase.
+- Track deferred work centrally. List deferred items in one place with reason and follow-up trigger.
+- Every plan must state: `Do not commit without user approval. Each phase may go through multiple review rounds.`
 
 # Review Heuristics
 

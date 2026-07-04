@@ -32,8 +32,8 @@ Unclear->ask.
 
 # Phase Details
 First Plan/Review: MUST read `.agents/RULES.md`. Only chance. Never skip.
-Plan: write `.agents/plan/YYYY-MM-DD-<slug>.md`. Gap-check before switching.
-Implement: follow plan. Clean/DRY/production-ready on every file.
+Plan: discuss the plan. Write `.agents/plan/YYYY-MM-DD-<slug>.md` only when the user explicitly asks for a persisted plan file.
+Implement: follow confirmed plan or user instructions. If user says `/do` without asking for a plan file, implement without writing one. Clean/DRY/production-ready on every file.
   After changes: re-read every changed file. Verify. Don't trust memory past 200k.
 Checkpoint: at ~50 turns / Implement done / Review bugs -> offer.
   Read `.agents/CHECKPOINT.md.template`. Write `.agents/state/YYYY-MM-DD-<slug>.md`.
