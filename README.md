@@ -9,10 +9,10 @@ AI workflow rules for coding agents. Portable across opencode, Claude Code, Anti
 git clone https://github.com/kushaldotdev/system-instructions ~/system-instructions
 
 # Install globally -- applies to ALL projects automatically
-bash ~/system-instructions/.agents/install.sh --global
+bash ~/projects/system-instructions/.agents/install.sh --global
 
 # Or install per project (skips tools already installed globally)
-bash ~/system-instructions/.agents/install.sh --project ~/my-project
+bash ~/projects/system-instructions/.agents/install.sh --project ~/my-project
 ```
 
 During installation, you choose the **instructions format**:
@@ -107,8 +107,8 @@ The installer prompts whether to enable **LSP (Language Server Protocol)** for o
 Edit central files, then re-run the installer:
 
 ```bash
-bash ~/system-instructions/.agents/install.sh --global
-bash ~/system-instructions/.agents/install.sh --project ~/my-project
+bash ~/projects/system-instructions/.agents/install.sh --global
+bash ~/projects/system-instructions/.agents/install.sh --project ~/my-project
 ```
 
 Instruct bridges always reference central files by absolute path, so the AI reads the latest content every session. No stale copies.
