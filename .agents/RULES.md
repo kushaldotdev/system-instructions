@@ -10,7 +10,7 @@
 6. Present summary: what, where, approach, phases, risks.
 7. Ask confirmation. Ask whether the user wants a persisted plan file or implementation only.
 8. On /do: implement unless the user explicitly requested a plan file. Write `.agents/plan/YYYY-MM-DD-<slug>.md` only on explicit request. Gap-check: re-read plan/intent vs task vs files. Fix vague/missing/risky steps.
-9. At ~50 turns: offer checkpoint before Implement.
+9. At ~50 turns: offer checkpoint before Implement. If not written, offer/remind every 20 turns thereafter (70, 90, etc.).
 
 ## Output Template
 ```
@@ -84,7 +84,7 @@ Ask the user: "Do you want test-based analysis for this review?"
 Only proceed if they say yes. Not the default.
 
 ## Session Checkpoint
-When context is large (~50 turns), after Implement with verified changes, or after finding bugs in Review: offer to write a checkpoint. Read CHECKPOINT.md.template from config dir. Write to `.agents/state/YYYY-MM-DD-<slug>.md`. Ask user before writing.
+When context is large (~50 turns), after Implement with verified changes, or after finding bugs in Review: offer to write a checkpoint. If not written, offer/remind every 20 turns thereafter (70, 90, etc.). Read CHECKPOINT.md.template from config dir. Write to `.agents/state/YYYY-MM-DD-<slug>.md`. Ask user before writing.
 
 ## Output Template
 ```

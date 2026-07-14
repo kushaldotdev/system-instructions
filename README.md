@@ -81,7 +81,7 @@ Creates bridge files inside a project directory. Tools already configured global
 
 ## Checkpoint System
 
-When a session context grows large (~50 turns), after completing changes, or after finding bugs during review -- the AI offers to write a **checkpoint** and resume in a fresh session. This prevents context bloat and memory drift.
+When a session context grows large (asks at ~50 turns, then reminds every 20 turns thereafter: 70, 90, etc.), after completing changes, or after finding bugs during review -- the AI offers to write a **checkpoint** and resume in a fresh session. This prevents context bloat and memory drift.
 
 **Flow:**
 1. AI detects trigger condition and asks: "Context large -- write checkpoint and resume new session? [y/N]"
