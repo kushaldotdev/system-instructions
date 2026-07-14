@@ -519,6 +519,22 @@ for sel in $selection; do
   fi
 done
 
+# Disable Claude Code compatibility in OpenCode by default
+if [[ " $selection " =~ " 1 " ]]; then
+  echo ""
+  echo "Disabling Claude Code compatibility for OpenCode..."
+  for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if [ -f "$profile" ]; then
+      if ! grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
+        echo 'export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true' >> "$profile"
+        echo "  Added to $profile"
+      else
+        echo "  Already configured in $profile"
+      fi
+    fi
+  done
+fi
+
 echo ""
 echo "=== Done ==="
 echo "  Format: $FORMAT ($INSTR_TEXT)"

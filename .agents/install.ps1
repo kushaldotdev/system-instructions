@@ -445,6 +445,14 @@ foreach ($sel in $selection) {
     if ($runProject) { Install-ProjectTool -ToolNum $num -Target $ProjectDir }
 }
 
+# Disable Claude Code compatibility in OpenCode by default
+if ($selection -contains '1') {
+    Write-Host ""
+    Write-Host "Disabling Claude Code compatibility for OpenCode in Windows environment..."
+    [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', 'true', 'User')
+    Write-Host "  Set User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true"
+}
+
 Write-Host ""
 Write-Host "========================="
 Write-Host "  Done!"
