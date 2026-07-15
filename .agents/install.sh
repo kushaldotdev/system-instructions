@@ -522,17 +522,37 @@ done
 # Disable Claude Code compatibility in OpenCode by default
 if [[ " $selection " =~ " 1 " ]]; then
   echo ""
-  echo "Disabling Claude Code compatibility for OpenCode..."
-  for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
-    if [ -f "$profile" ]; then
-      if ! grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
-        echo 'export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true' >> "$profile"
-        echo "  Added to $profile"
-      else
-        echo "  Already configured in $profile"
-      fi
-    fi
-  done
+  echo "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+  echo "  Recommended to avoid conflicting rule definitions between agents."
+  read -p "Choice (Y/n): " disable_choice
+  case "$disable_choice" in
+    n|N|no|No)
+      echo "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."
+      for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+        if [ -f "$profile" ]; then
+          if grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
+            sed -i '/OPENCODE_DISABLE_CLAUDE_CODE_PROMPT/d' "$profile"
+            echo "    Removed from $profile"
+          else
+            echo "    Already clean in $profile"
+          fi
+        fi
+      done
+      ;;
+    *)
+      echo "  Disabling Claude Code compatibility for OpenCode..."
+      for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+        if [ -f "$profile" ]; then
+          if ! grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
+            echo 'export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true' >> "$profile"
+            echo "    Added to $profile"
+          else
+            echo "    Already configured in $profile"
+          fi
+        fi
+      done
+      ;;
+  esac
 fi
 
 echo ""

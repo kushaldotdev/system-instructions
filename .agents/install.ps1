@@ -448,9 +448,18 @@ foreach ($sel in $selection) {
 # Disable Claude Code compatibility in OpenCode by default
 if ($selection -contains '1') {
     Write-Host ""
-    Write-Host "Disabling Claude Code compatibility for OpenCode in Windows environment..."
-    [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', 'true', 'User')
-    Write-Host "  Set User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true"
+    Write-Host "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+    Write-Host "  Recommended to avoid conflicting rule definitions between agents."
+    $disableInput = Read-Host "Choice (Y/n)"
+    if ($disableInput -match '^[nN]') {
+        Write-Host "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."
+        [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', $null, 'User')
+        Write-Host "    Deleted User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT"
+    } else {
+        Write-Host "  Disabling Claude Code compatibility for OpenCode in Windows environment..."
+        [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', 'true', 'User')
+        Write-Host "    Set User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true"
+    }
 }
 
 Write-Host ""
