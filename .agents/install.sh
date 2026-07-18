@@ -19,7 +19,7 @@ while [ $# -gt 0 ]; do
     --project) MODE="project"; shift; PROJECT_DIR="${1:-}"; [ -z "$PROJECT_DIR" ] && { echo "Usage: --project <dir>"; exit 1; }; shift ;;
     --no-pause) NO_PAUSE=true; shift ;;
     --force) FORCE=true; shift ;;
-    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>] [--force] [--no-pause]"; exit 0 ;;
+    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>] [--force] [--no-pause (skip final Enter prompt)]"; exit 0 ;;
     *) echo "Unknown: $1"; exit 1 ;;
   esac
 done
@@ -80,9 +80,6 @@ case "$fmt" in
     INSTR_TEXT="SYSTEM_PROMPT.md and RULES.md"
     OCFILE1="$SYSP"
     OCFILE2="$RULES"
-    AG_SYMLINKS="SYSTEM_PROMPT.md RULES.md"
-    AG_LINK_SRC1="$SYSP"
-    AG_LINK_SRC2="$RULES"
     ;;
   s|S)
     FORMAT="standalone"
@@ -90,9 +87,6 @@ case "$fmt" in
     INSTR_TEXT="INSTRUCTIONS.md"
     OCFILE1="$INST"
     OCFILE2=""
-    AG_SYMLINKS="INSTRUCTIONS.md RULES.md"
-    AG_LINK_SRC1="$INST"
-    AG_LINK_SRC2="$RULES"
     ;;
   *) echo "Invalid"; exit 1 ;;
 esac
@@ -380,32 +374,15 @@ jsonc_instructions() {
     # --- fix external_directory for global configs ---
     if [ -n "$ext_dir_pattern" ] && ! grep -q '"external_directory"' "$json" 2>/dev/null; then
       awk -v ext_dir="$ext_dir_pattern" '
-        /"permission"/ {
-          ins = 1
-          depth = 0
-          for (j = 1; j <= length($0); j++) {
-            c = substr($0, j, 1)
-            if (c == "{") depth++
-            if (c == "}") depth--
-          }
-          print; next
+        /"permission"[[:space:]]*:/ && !inserted {
+          print
+          printf "    \"external_directory\": {\n"
+          printf "      \"%s\": \"allow\"\n", ext_dir
+          printf "    },\n"
+          inserted = 1
+          next
         }
-        ins {
-          for (j = 1; j <= length($0); j++) {
-            c = substr($0, j, 1)
-            if (c == "{") depth++
-            if (c == "}") depth--
-          }
-          if (depth == 0) {
-              printf "    \"external_directory\": {\n"
-              printf "      \"%s\": \"allow\"\n", ext_dir
-              printf "    }\n"
-              print
-              ins = 0
-              next
-            } else { print; prev = $0 }
-        }
-        !ins { print }
+        { print }
       ' "$json" > "$tmp" && mv "$tmp" "$json"
       changed=true
     fi
@@ -467,14 +444,10 @@ antigravity_project() {
   if [ "$FORMAT" = "modular" ]; then
     local prompt="$rules_dir/SYSTEM_PROMPT.md"
     if [ -L "$prompt" ]; then rm -f "$prompt"; fi
-    if [ -e "$prompt" ]; then
-      echo "    [exists] $prompt"
-    else
-      sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
-          -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
-          "$SYSP" > "$prompt"
-      echo "    [copy]   $prompt"
-    fi
+    sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+        -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
+        "$SYSP" > "$prompt"
+    echo "    [copy]   $prompt"
     for f in RULES.md CHECKPOINT.md.template; do
       local link="$rules_dir/$f"
       local src="$CENTRAL_ROOT/.agents/$f"
@@ -488,14 +461,10 @@ antigravity_project() {
   else
     local prompt="$rules_dir/INSTRUCTIONS.md"
     if [ -L "$prompt" ]; then rm -f "$prompt"; fi
-    if [ -e "$prompt" ]; then
-      echo "    [exists] $prompt"
-    else
-      sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
-          -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
-          "$INST" > "$prompt"
-      echo "    [copy]   $prompt"
-    fi
+    sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+        -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
+        "$INST" > "$prompt"
+    echo "    [copy]   $prompt"
     for f in RULES.md CHECKPOINT.md.template; do
       local link="$rules_dir/$f"
       local src="$CENTRAL_ROOT/.agents/$f"
@@ -613,7 +582,7 @@ for sel in $selection; do
 done
 
 # Disable Claude Code compatibility in OpenCode by default
-if [[ " $selection " =~ " 1 " ]]; then
+if [[ " $selection " =~ " 1 " ]] && { [ "$MODE" = "global" ] || [ "$MODE" = "both" ]; }; then
   echo ""
   echo "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
   echo "  Recommended to avoid conflicting rule definitions between agents."

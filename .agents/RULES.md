@@ -1,132 +1,27 @@
-# Plan Framework
-
-## Steps (ordered -- never skip, never reorder)
-0. Parent agent only: clarify goal, scope, requirements when material ambiguity remains. Subagents execute delegation without interviews.
-1. Read AGENTS.md + source files. Not from memory.
-2. Map dependency graph: every file changed -> every dependent.
-3. Order by risk: highest uncertainty first (fail fast).
-4. Define contracts before any implementation.
-5. Each phase: specify rollback.
-6. Present summary: what, where, approach, phases, risks.
-7. Parent agent only: ask confirmation when plan approval is needed. Ask whether user wants a persisted plan file or implementation only. Subagents execute delegation without confirmation.
-8. On /do: implement unless the user explicitly requested a plan file. Write `.agents/plan/YYYY-MM-DD-<slug>.md` only on explicit request. Gap-check: re-read plan/intent vs task vs files. Fix vague/missing/risky steps.
-9. At ~50 turns: offer checkpoint before Implement. If not written, offer/remind every 20 turns thereafter (70, 90, etc.).
-
-## Output Template
-```
 # Plan
-## Summary
-## Phases
-Phase N: <files> <exact changes> <risks> <rollback>
-## Edge Cases
-## Verification
-```
+- Parent only: clarify material ambiguity; subagents execute delegation.
+- Read project guidance and affected code. Map callers, dependencies, contracts, risks, and rollback before changing behavior.
+- Plan highest uncertainty first. State files, exact changes, risks, edge cases, verification, and deferred work.
+- Parent asks approval only when plan approval is needed. Persist plan only on explicit request.
+- Do not commit without approval. Review may require multiple rounds.
+- Significant decision: compare 2+ options; state choice, tradeoff, change condition.
+- Plan output: summary; phases (files, changes, risks, rollback); edges; verification.
 
-## Decision Records
-Before significant decisions:
-- List 2+ alternatives with pros/cons. State why chosen. Note what changes decision.
-- 3-5 sentences max. Don't over-document.
-
-## Plan Robustness Rules
-- Split oversized phases. If one phase is larger than the rest combined, split it. Each phase should be completable and committable in 1-3 days.
-- For risky phases touching multiple existing implementations, add `Critical Hints` with 3-5 files/concepts to read first.
-- For risky phases, add `Anti-Patterns -- Do NOT` with 3-5 likely mistakes to avoid.
-- Prefer concrete contracts over prose. Pick exact threshold values, field names, type names, nullability, and data shapes.
-- Define contracts before implementation. For new APIs or shared types, include the actual schema/interface/type/DTO used by the project stack.
-- For migrations, specify rollback behavior. Test downgrade/rollback, state what it reverses, and note whether backfilled data needs cleanup.
-- Do not plan a consumer without its producer. UI, CLI, workers, or integrations that depend on data must be planned with the producing API/event/file/job in the same or earlier phase.
-- Track deferred work centrally. List deferred items in one place with reason and follow-up trigger.
-- Every plan must state: `Do not commit without user approval. Each phase may go through multiple review rounds.`
-
-# Review Heuristics
-
-## Multi-Pass (run in sequence)
-Pass 1 -- **Architecture**: Sound? Layer violations? Contract mismatches?
-Pass 2 -- **Data Flow**: Input->transform->output. Data integrity preserved?
-Pass 3 -- **Error Paths**: Every null/error/empty return. What reaches user? Leaks resources?
-Pass 4 -- **Security**: Untrusted input paths. Auth at boundaries. Injection vectors.
-Pass 5 -- **Readability**: First-time reader test. Confusing names? Missing context?
-
-## Perspectives (apply to every pass)
-- Security auditor: where could untrusted data reach sensitive operations?
-- Adversarial: how would you intentionally break this?
-- Performance: what scales poorly? N+1? Unbounded allocations? Sync in async path?
-- User: what happens when things go wrong? Clear error messages? Recovery paths?
-
-## State Analysis
-For every function with branching logic, mentally test:
-- Null/empty input
-- Single-element input
-- Typical input
-- Boundary (max/min/overflow)
-- Multiple edge conditions simultaneously true
-
-## Cross-Boundary Audit
-For every function/API boundary:
-- List caller assumptions (input format, non-null guarantees, state preconditions)
-- List callee guarantees (output format, error behavior, postconditions)
-- Mark every mismatch. Every mismatch is a potential production bug.
-
-## Language-Specific Gotchas
-
-PHP: `==` vs `===` (always strict) | `unserialize()` on untrusted data = RCE risk | raw SQL interpolation = injection | use `$stmt->execute(['?'])` with `?` placeholders, never `PDO::query()` or string interpolation
-
-Python: mutable default args (`def f(x=[])`) shared across calls | bare `except:` catches KeyboardInterrupt | late-binding closures in loops
-
-JavaScript: `0.1 + 0.2 !== 0.3` | empty `catch {}` swallows all errors | ASI breaks `return \n value` => undefined
-
-React/TypeScript: stale closures in useEffect/useCallback (list all deps) | state reads after setState are stale | array index as `key` breaks list stability
-
-HTML/CSS: missing `alt` = accessibility failure | `z-index` without `position` is ignored | missing viewport meta breaks mobile layout
-
-## Test-Based Review
-Run focused available tests when useful. Ask only when testing is costly, destructive, or needs credentials, environment selection, or unavailable dependencies.
-
-## Session Checkpoint
-When context is large (~50 turns), after Implement with verified changes, or after finding bugs in Review: offer to write a checkpoint. If not written, offer/remind every 20 turns thereafter (70, 90, etc.). Read CHECKPOINT.md.template from config dir. Write to `.agents/state/YYYY-MM-DD-<slug>.md`. Ask user before writing.
-
-## Output Template
-```
 # Review
-## Files Checked
-## Pass Results
-Pass N: <finding> | <file:line> | <severity: critical/major/minor>
-## Boundary Mismatches Found
-## Language-Specific Issues
-## Verdict
-```
+Check, in order: architecture/contracts; data flow; null/error/empty paths; security boundaries; readability.
+For branches: test empty, single, typical, boundary, and combined-edge states.
+For boundaries: compare caller assumptions with callee guarantees.
+Report findings first: `file:line | severity | impact`. No findings: state that, then testing gap.
+Run focused available tests when useful. Ask only for costly, destructive, credentialed, or environment-dependent tests.
+- Review output: files; pass findings; boundary mismatches; verdict.
 
-## Root Cause Analysis (Debugging)
-1. Reproduce -- get a reliable reproducer.
-2. Isolate -- minimal steps, not the whole flow.
-3. Trace data flow -- input -> transformation -> output.
-4. Hypothesis -- one variable at a time, rule out causes.
-5. Fix -- address root cause, not symptom.
-6. Verify -- reproducer passes, no regression.
+# Debug And Verify
+Reproduce. Minimize. Trace input to output. Test one hypothesis at a time. Fix root cause. Re-run reproducer and regression checks.
+Before presenting: re-read diff, trace changed branches, check errors/types/imports, test relevant edge cases, check messages.
 
-## Code Self-Review (before presenting)
-1. Re-read the diff -- does it match intent?
-2. Trace every branch -- no missing cases.
-3. Check null/error paths -- every return handled?
-4. Verify imports, signatures, type consistency.
-5. Test (mental) edge cases -- empty, boundary, concurrent.
-6. Check log/error messages -- useful or noise?
-
-## Testing Guidance
-- Python: pytest. Parametrize edge cases; test error paths.
-- JavaScript/TypeScript: vitest/jest. Type narrow before runtime test.
-- React: Testing Library. Test behavior, not implementation.
-- HTML/CSS: visual regression or omit; type system + lint covers most.
-- Rule: one behavior change per test method. Clear naming.
-
-## Refactoring Principles
-- Prefer small focused changes over sweeping rewrites.
-- One concern per change. Extract before rewriting.
-- Preserve existing behavior until the last step.
-- If a change touches >5 files, split into phases.
-
-## Commit Hygiene
-- Format: `type(scope): description` (feat, fix, refactor, chore, docs, test)
-- Each commit is one logical change.
-- Message explains why, not what (diff shows what).
-- Use `git diff --stat` before commit to verify scope.
+# Engineering
+- Small focused changes. Preserve behavior until replacement is ready.
+- New APIs/types: state exact contract, nullable/error behavior, and consumers.
+- Migrations: state rollback and backfill cleanup.
+- Prefer strict comparison, parameterized SQL, no mutable Python defaults, no empty JavaScript catches, stable React keys, and accessible HTML.
+- Tests: one behavior per test, clear name, public contract and error paths covered.

@@ -19,8 +19,6 @@ $HomeDir = $env:USERPROFILE
 $Mode = ''
 $ProjectDir = ''
 $Format = ''
-$Ocfile1 = ''
-$Ocfile2 = ''
 
 Write-Host "============================================"
 Write-Host "  .agents Workflow Installer"
@@ -75,13 +73,9 @@ $fmt = Read-Host "Choice (m/s)"
 switch -regex ($fmt) {
     '^[mM]$' {
         $Format = 'modular'
-        $Ocfile1 = $Sysp
-        $Ocfile2 = $Rules
     }
     '^[sS]$' {
         $Format = 'standalone'
-        $Ocfile1 = $Inst
-        $Ocfile2 = ''
     }
     default { Write-Host "Invalid"; exit 1 }
 }
@@ -192,12 +186,6 @@ Function Write-JsoncConfig {
             $newBlock = "`"instructions`": [`n    $localQuoted`n  ]"
             $content = $content.Substring(0, $start) + $newBlock + $content.Substring($end)
             $changed = $true
-        } elseif ($content -match '"instructions"\s*:\s*\[[^\]]*RULES\.md') {
-            $start = $content.IndexOf('"instructions"')
-            $end = $content.IndexOf(']', $start) + 1
-            $newBlock = "`"instructions`": [`n    $localQuoted`n  ]"
-            $content = $content.Substring(0, $start) + $newBlock + $content.Substring($end)
-            $changed = $true
         } elseif (-not ($content -match '"instructions"')) {
             $lastBrace = $content.LastIndexOf('}')
             $before = $content.Substring(0, $lastBrace).TrimEnd()
@@ -205,7 +193,7 @@ Function Write-JsoncConfig {
             $newBlock = "`"instructions`": [`n    $localQuoted`n  ]"
             if ($before -match ',$') {
                 $content = $before + "`n  " + $newBlock + "`n" + $after
-            } else {
+            } elseif ($permStart -lt 0) {
                 $content = $before + ",`n  " + $newBlock + "`n" + $after
             }
             $changed = $true
@@ -299,14 +287,8 @@ Function Write-JsoncConfig {
                         elseif ($c -eq '}') { $depth--; if ($depth -eq 0) { $insertPos = $i; break } }
                     }
                     if ($insertPos -gt 0) {
-                        $before = $content.Substring(0, $insertPos).TrimEnd()
-                        $after = $content.Substring($insertPos)
                         $extDirRule = "`"external_directory`": {`n        `"$extDirPattern`": `"allow`"`n      }"
-                        if ($before -match ',$') {
-                            $content = $before + "`n      " + $extDirRule + "`n    " + $after
-                        } else {
-                            $content = $before + ",`n      " + $extDirRule + "`n    " + $after
-                        }
+                        $content = $content.Substring(0, $braceStart + 1) + "`n      " + $extDirRule + "," + $content.Substring($braceStart + 1)
                         $changed = $true
                     }
                 }
@@ -390,14 +372,10 @@ Function Install-AntigravityProject {
     $promptName = if ($Format -eq 'modular') { 'SYSTEM_PROMPT.md' } else { 'INSTRUCTIONS.md' }
     $promptSource = if ($Format -eq 'modular') { $Sysp } else { $Inst }
     $prompt = Join-Path -Path $rulesDir -ChildPath $promptName
-    if (Test-Path -Path $prompt -PathType Leaf) {
-        Write-Host "    [exists] $prompt"
-    } else {
-        $content = (Get-Content -Path $promptSource -Raw) -replace '\.agents/RULES\.md', "$rulesDir\RULES.md"
-        $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$rulesDir\CHECKPOINT.md.template"
-        Set-Content -Path $prompt -Value $content -Encoding UTF8
-        Write-Host "    [copy]   $prompt"
-    }
+    $content = (Get-Content -Path $promptSource -Raw) -replace '\.agents/RULES\.md', "$rulesDir\RULES.md"
+    $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$rulesDir\CHECKPOINT.md.template"
+    Set-Content -Path $prompt -Value $content -Encoding UTF8
+    Write-Host "    [copy]   $prompt"
     $files = @('RULES.md', 'CHECKPOINT.md.template')
     foreach ($f in $files) {
       $link = Join-Path -Path $rulesDir -ChildPath $f
@@ -504,7 +482,7 @@ foreach ($sel in $selection) {
 }
 
 # Disable Claude Code compatibility in OpenCode by default
-if ($selection -contains '1') {
+if (($selection -contains '1') -and ($runGlobal)) {
     Write-Host ""
     Write-Host "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
     Write-Host "  Recommended to avoid conflicting rule definitions between agents."

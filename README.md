@@ -19,8 +19,8 @@ During installation, you choose the **instructions format**:
 
 | Format | Files | Token cost |
 |--------|-------|------------|
-| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | ~590t always + ~1,300t on-demand |
-| **Standalone** | `INSTRUCTIONS.md` (merged) | ~2,030t always loaded |
+| **Modular** (default) | `SYSTEM_PROMPT.md` + `RULES.md` | small prompt + on-demand rules |
+| **Standalone** | `INSTRUCTIONS.md` (merged) | compact rules always loaded |
 
 ## Structure
 
@@ -41,7 +41,7 @@ INSTRUCTIONS.md             <- standalone merge (SYSTEM_PROMPT.md + RULES.md)
 
 ## How Deployment Works
 
-You keep one central copy of the rules. Every tool gets a small **instruct bridge** file that tells the AI to read the central files using absolute paths. The format (modular or standalone) determines which files the bridge references.
+The installer copies generated instruction files beside each tool config. Re-run it after changing central rules.
 
 ### Global Install
 
@@ -63,7 +63,7 @@ Creates bridge files inside a project directory. Tools already configured global
 | Tool | File | Method |
 |------|------|--------|
 | opencode | `opencode.jsonc` | `instructions` array with absolute paths |
-| Antigravity | `.agent/rules/SYSTEM_PROMPT.md` + `RULES.md` | Symlinks to central files |
+| Antigravity | `.agent/rules/` prompt + `RULES.md` | Generated prompt plus local rule link/copy |
 | Claude Code | `CLAUDE.md` | Instruct bridge + preserves project content |
 | Codex | `AGENTS.md` | Instruct bridge + preserves project content |
 | Cline | `.clinerules` | Instruct bridge + preserves project content |
@@ -73,11 +73,11 @@ Creates bridge files inside a project directory. Tools already configured global
 
 | File | When loaded | Token cost |
 |------|-------------|------------|
-| SYSTEM_PROMPT.md | session start | ~590 |
-| RULES.md | first Plan or Review action | ~1,300 (one time) |
-| CHECKPOINT.md.template | on checkpoint trigger (context overflow) | ~200 (one time per checkpoint) |
+| SYSTEM_PROMPT.md | session start | compact always-loaded rules |
+| RULES.md | first Plan or Review action | compact on-demand rules |
+| CHECKPOINT.md.template | on checkpoint trigger | one time per checkpoint |
 | Project AGENTS.md | session start | project-dependent |
-| **Total** | | **~1,890 + project context** |
+| **Total** | | compact rules + project context |
 
 ## Checkpoint System
 
@@ -111,4 +111,4 @@ bash ~/projects/system-instructions/.agents/install.sh --global
 bash ~/projects/system-instructions/.agents/install.sh --project ~/my-project
 ```
 
-Instruct bridges always reference central files by absolute path, so the AI reads the latest content every session. No stale copies.
+Re-run installer after editing central files to refresh installed copies.
