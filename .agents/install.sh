@@ -90,9 +90,9 @@ case "$fmt" in
     INSTR_TEXT="INSTRUCTIONS.md"
     OCFILE1="$INST"
     OCFILE2=""
-    AG_SYMLINKS="INSTRUCTIONS.md"
+    AG_SYMLINKS="INSTRUCTIONS.md RULES.md"
     AG_LINK_SRC1="$INST"
-    AG_LINK_SRC2=""
+    AG_LINK_SRC2="$RULES"
     ;;
   *) echo "Invalid"; exit 1 ;;
 esac
@@ -148,10 +148,10 @@ write_instruct_bridge() {
     fi
   fi
 
+  # RULES.md is always installed for subagents. Checkpoint template is on demand.
+  cp -f "$RULES" "$dir/RULES.md"
+  cp -f "$CHECKPOINT_TEMPLATE" "$dir/CHECKPOINT.md.template"
   if [ "$FORMAT" = "modular" ]; then
-    # Copy RULES.md and CHECKPOINT.md.template (not SYSTEM_PROMPT.md -- it IS the file)
-    cp -f "$RULES" "$dir/RULES.md"
-    cp -f "$CHECKPOINT_TEMPLATE" "$dir/CHECKPOINT.md.template"
     # Write SYSP content with marker header + path substitution
     { echo "# AI Behavior Rules"
       sed -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
@@ -159,9 +159,11 @@ write_instruct_bridge() {
           "$SYSP"
     } > "$file"
   else
-    # Write INST content with marker header (fully self-contained)
+    # Write standalone instructions with local on-demand rules path.
     { echo "# AI Behavior Rules"
-      cat "$INST"
+      sed -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
+          -e "s|\.agents/CHECKPOINT\.md\.template|$dir/CHECKPOINT.md.template|g" \
+          "$INST"
     } > "$file"
   fi
   echo "    [write] $file"
@@ -176,16 +178,26 @@ jsonc_instructions() {
   local add_lsp="${4:-false}"
   local json="$target/$filename"
 
-  cp -f "$SYSP" "$target/SYSTEM_PROMPT.md"
+  local instruction_source="$SYSP"
+  local instruction_dest="$target/SYSTEM_PROMPT.md"
+  if [ "$FORMAT" = "standalone" ]; then
+    instruction_source="$INST"
+    instruction_dest="$target/INSTRUCTIONS.md"
+  fi
+  cp -f "$instruction_source" "$instruction_dest"
   cp -f "$RULES" "$target/RULES.md"
   cp -f "$CHECKPOINT_TEMPLATE" "$target/CHECKPOINT.md.template"
-  echo "    [copy]   $target/SYSTEM_PROMPT.md, $target/RULES.md, $target/CHECKPOINT.md.template"
+  echo "    [copy]   $instruction_dest, $target/RULES.md, $target/CHECKPOINT.md.template"
 
-  sed -i "s|\\.agents/RULES\\.md|$target/RULES.md|g" "$target/SYSTEM_PROMPT.md"
-  sed -i "s|\\.agents/CHECKPOINT\\.md\\.template|$target/CHECKPOINT.md.template|g" "$target/SYSTEM_PROMPT.md"
+  sed -i "s|\\.agents/RULES\\.md|$target/RULES.md|g" "$instruction_dest"
+  sed -i "s|\\.agents/CHECKPOINT\\.md\\.template|$target/CHECKPOINT.md.template|g" "$instruction_dest"
 
-  local sysp_quoted="\"$target/SYSTEM_PROMPT.md\""
+  local instruction_quoted="\"$instruction_dest\""
   local perm_path="$target/*.md"
+  local perm_path_tilde=""
+  if [[ "$target" == "$HOME"* ]]; then
+    perm_path_tilde="~${target#$HOME}/*.md"
+  fi
 
   local ext_dir_pattern=""
   if [ "$label" = "global" ]; then
@@ -197,19 +209,17 @@ jsonc_instructions() {
     local changed=false
     local tmp="$json.tmp"
 
-    # --- fix instructions (only SYSTEM_PROMPT.md, no RULES.md) ---
-    grep -q '"instructions".*RULES\.md' "$json" 2>/dev/null && local has_rules=true || local has_rules=false
     grep -q '"instructions"' "$json" 2>/dev/null && local has_inst=true || local has_inst=false
 
-    if [ "$has_rules" = true ]; then
-      awk -v new="  \"instructions\": [\n    $sysp_quoted\n  ]" '
+    if [ "$has_inst" = true ] && ! grep -qF "$instruction_dest" "$json" 2>/dev/null; then
+      awk -v new="  \"instructions\": [\n    $instruction_quoted\n  ]" '
         /"instructions"/ { skip = 1 }
         skip && /\]/ { print new; skip = 0; next }
         !skip { print }
       ' "$json" > "$tmp" && mv "$tmp" "$json"
       changed=true
     elif [ "$has_inst" = false ]; then
-      awk -v new="  \"instructions\": [\n    $sysp_quoted\n  ]" '
+      awk -v new="  \"instructions\": [\n    $instruction_quoted\n  ]" '
         { lines[NR] = $0 }
         END {
           depth = 0; last = 0
@@ -237,40 +247,91 @@ jsonc_instructions() {
     fi
 
     # --- fix read permission for *.md ---
-    if ! grep -qF "$perm_path" "$json" 2>/dev/null; then
+    if ! grep -qF "$perm_path" "$json" 2>/dev/null || { [ -n "$perm_path_tilde" ] && ! grep -qF "$perm_path_tilde" "$json" 2>/dev/null; }; then
       grep -q '"permission"' "$json" 2>/dev/null && local has_perm=true || local has_perm=false
 
       if [ "$has_perm" = true ]; then
-        awk -v perm="$perm_path" '
-          /"permission"/ {
-            ins = 1
-            depth = 0
-            for (j = 1; j <= length($0); j++) {
-              c = substr($0, j, 1)
-              if (c == "{") depth++
-              if (c == "}") depth--
+        if grep -q '"read"[[:space:]]*:' "$json" 2>/dev/null; then
+          # Replace existing read block in place, preserving surrounding commas and rules.
+          awk -v perm="$perm_path" -v perm_tilde="$perm_path_tilde" '
+          function brace_delta(line,    j, c, delta) {
+            delta = 0
+            for (j = 1; j <= length(line); j++) {
+              c = substr(line, j, 1)
+              if (c == "{") delta++
+              if (c == "}") delta--
             }
-            print; next
+            return delta
           }
-          ins {
-            for (j = 1; j <= length($0); j++) {
-              c = substr($0, j, 1)
-              if (c == "{") depth++
-              if (c == "}") depth--
+          /"permission"[[:space:]]*:/ && !in_perm {
+            in_perm = 1
+            perm_depth = brace_delta($0)
+            print
+            next
+          }
+          in_perm && !skip && /"read"[[:space:]]*:/ {
+            perm_depth += brace_delta($0)
+            read_depth = brace_delta($0)
+            if (!replaced) {
+              match($0, /^[[:space:]]*/)
+              indent = substr($0, RSTART, RLENGTH)
+              printf "%s\"read\": {\n", indent
+              printf "%s  \"%s\": \"allow\"", indent, perm
+              if (perm_tilde != "") {
+                printf ",\n%s  \"%s\": \"allow\"\n", indent, perm_tilde
+              } else {
+                printf "\n"
+              }
+              if (read_depth <= 0) {
+                comma = $0 ~ /}[[:space:]]*,[[:space:]]*$/ ? "," : ""
+                printf "%s}%s\n", indent, comma
+              }
+              replaced = 1
             }
-            if (depth == 0) {
-              printf "    \"read\": {\n"
-              printf "      \"" perm "\": \"allow\"\n"
-              printf "    },\n"
+            skip = read_depth > 0
+            if (perm_depth == 0) in_perm = 0
+            next
+          }
+          in_perm && skip {
+            delta = brace_delta($0)
+            perm_depth += delta
+            read_depth += delta
+            if (read_depth <= 0) {
+              comma = $0 ~ /}[[:space:]]*,[[:space:]]*$/ ? "," : ""
+              printf "%s}%s\n", indent, comma
+              skip = 0
+            }
+            if (perm_depth == 0) in_perm = 0
+            next
+          }
+          in_perm {
+            perm_depth += brace_delta($0)
+            print
+            if (perm_depth == 0) in_perm = 0
+            next
+          }
+          { print }
+          ' "$json" > "$tmp" && mv "$tmp" "$json"
+        else
+          awk -v perm="$perm_path" -v perm_tilde="$perm_path_tilde" '
+            /"permission"[[:space:]]*:/ && !inserted {
               print
-              ins = 0
+              printf "    \"read\": {\n"
+              printf "      \"%s\": \"allow\"", perm
+              if (perm_tilde != "") {
+                printf ",\n      \"%s\": \"allow\"\n", perm_tilde
+              } else {
+                printf "\n"
+              }
+              printf "    },\n"
+              inserted = 1
               next
-            } else { print; prev = $0 }
-          }
-          !ins { print }
-        ' "$json" > "$tmp" && mv "$tmp" "$json"
+            }
+            { print }
+          ' "$json" > "$tmp" && mv "$tmp" "$json"
+        fi
       else
-        awk -v perm="$perm_path" -v ext_dir="$ext_dir_pattern" '
+        awk -v perm="$perm_path" -v perm_tilde="$perm_path_tilde" -v ext_dir="$ext_dir_pattern" '
           { lines[NR] = $0 }
           END {
             depth = 0; last = 0
@@ -292,7 +353,12 @@ jsonc_instructions() {
               if (i == last) {
                 print "  \"permission\": {"
                 print "    \"read\": {"
-                print "      \"" perm "\": \"allow\""
+                printf "      \"%s\": \"allow\"", perm
+                if (perm_tilde != "") {
+                  printf ",\n      \"%s\": \"allow\"\n", perm_tilde
+                } else {
+                  printf "\n"
+                }
                 if (ext_dir != "") {
                   print "    },"
                   print "    \"external_directory\": {"
@@ -373,14 +439,18 @@ jsonc_instructions() {
     if [ "$add_lsp" = true ]; then
       lsp_json=$'\n  "lsp": true,'
     fi
+    local read_block="\"$perm_path\": \"allow\""
+    if [ -n "$perm_path_tilde" ]; then
+      read_block="\"$perm_path\": \"allow\",\n      \"$perm_path_tilde\": \"allow\""
+    fi
     cat > "$json" <<-EOF
 {
   "instructions": [
-    $sysp_quoted
+    $instruction_quoted
   ],$lsp_json
   "permission": {
     "read": {
-      "$perm_path": "allow"
+      $(printf "%b" "$read_block")
     }$ext_dir_json
   }
 }
@@ -395,7 +465,17 @@ antigravity_project() {
   mkdir -p "$rules_dir"
 
   if [ "$FORMAT" = "modular" ]; then
-    for f in SYSTEM_PROMPT.md RULES.md; do
+    local prompt="$rules_dir/SYSTEM_PROMPT.md"
+    if [ -L "$prompt" ]; then rm -f "$prompt"; fi
+    if [ -e "$prompt" ]; then
+      echo "    [exists] $prompt"
+    else
+      sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+          -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
+          "$SYSP" > "$prompt"
+      echo "    [copy]   $prompt"
+    fi
+    for f in RULES.md CHECKPOINT.md.template; do
       local link="$rules_dir/$f"
       local src="$CENTRAL_ROOT/.agents/$f"
       if [ -e "$link" ] || [ -L "$link" ]; then
@@ -406,13 +486,26 @@ antigravity_project() {
       fi
     done
   else
-    local link="$rules_dir/INSTRUCTIONS.md"
-    if [ -e "$link" ] || [ -L "$link" ]; then
-      echo "    [exists] $link"
+    local prompt="$rules_dir/INSTRUCTIONS.md"
+    if [ -L "$prompt" ]; then rm -f "$prompt"; fi
+    if [ -e "$prompt" ]; then
+      echo "    [exists] $prompt"
     else
-      ln -s "$INST" "$link"
-      echo "    [link]   $link -> $INST"
+      sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+          -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
+          "$INST" > "$prompt"
+      echo "    [copy]   $prompt"
     fi
+    for f in RULES.md CHECKPOINT.md.template; do
+      local link="$rules_dir/$f"
+      local src="$CENTRAL_ROOT/.agents/$f"
+      if [ -e "$link" ] || [ -L "$link" ]; then
+        echo "    [exists] $link"
+      else
+        ln -s "$src" "$link"
+        echo "    [link]   $link -> $src"
+      fi
+    done
   fi
 }
 

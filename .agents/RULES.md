@@ -1,14 +1,14 @@
 # Plan Framework
 
 ## Steps (ordered -- never skip, never reorder)
-0. Interview: clarify goal, scope, requirements. Understand fully before planning.
+0. Parent agent only: clarify goal, scope, requirements when material ambiguity remains. Subagents execute delegation without interviews.
 1. Read AGENTS.md + source files. Not from memory.
 2. Map dependency graph: every file changed -> every dependent.
 3. Order by risk: highest uncertainty first (fail fast).
 4. Define contracts before any implementation.
 5. Each phase: specify rollback.
 6. Present summary: what, where, approach, phases, risks.
-7. Ask confirmation. Ask whether the user wants a persisted plan file or implementation only.
+7. Parent agent only: ask confirmation when plan approval is needed. Ask whether user wants a persisted plan file or implementation only. Subagents execute delegation without confirmation.
 8. On /do: implement unless the user explicitly requested a plan file. Write `.agents/plan/YYYY-MM-DD-<slug>.md` only on explicit request. Gap-check: re-read plan/intent vs task vs files. Fix vague/missing/risky steps.
 9. At ~50 turns: offer checkpoint before Implement. If not written, offer/remind every 20 turns thereafter (70, 90, etc.).
 
@@ -80,8 +80,7 @@ React/TypeScript: stale closures in useEffect/useCallback (list all deps) | stat
 HTML/CSS: missing `alt` = accessibility failure | `z-index` without `position` is ignored | missing viewport meta breaks mobile layout
 
 ## Test-Based Review
-Ask the user: "Do you want test-based analysis for this review?"
-Only proceed if they say yes. Not the default.
+Run focused available tests when useful. Ask only when testing is costly, destructive, or needs credentials, environment selection, or unavailable dependencies.
 
 ## Session Checkpoint
 When context is large (~50 turns), after Implement with verified changes, or after finding bugs in Review: offer to write a checkpoint. If not written, offer/remind every 20 turns thereafter (70, 90, etc.). Read CHECKPOINT.md.template from config dir. Write to `.agents/state/YYYY-MM-DD-<slug>.md`. Ask user before writing.

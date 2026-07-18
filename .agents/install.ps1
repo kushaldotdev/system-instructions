@@ -137,8 +137,11 @@ Function Write-InstructBridge {
         $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template"
         Set-Content -Path $File -Value $content -Encoding UTF8
     } else {
-        # Write INST content with marker header (fully self-contained)
-        $content = "# AI Behavior Rules`r`n" + (Get-Content -Path $Inst -Raw)
+        Copy-Item -Path $Rules -Destination "$dir\RULES.md" -Force
+        Copy-Item -Path $CheckpointTemplate -Destination "$dir\CHECKPOINT.md.template" -Force
+        # Write standalone instructions with local on-demand rules path.
+        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Inst -Raw) -replace '\.agents/RULES\.md', "$dir\RULES.md")
+        $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template"
         Set-Content -Path $File -Value $content -Encoding UTF8
     }
     Write-Host "    [write] $File"
@@ -151,10 +154,12 @@ Function Write-JsoncConfig {
     param([string]$Target, [string]$Filename, [string]$Label, [bool]$AddLsp = $false)
     $json = Join-Path -Path $Target -ChildPath $Filename
 
-    $syspDest = Join-Path -Path $Target -ChildPath 'SYSTEM_PROMPT.md'
+    $instructionName = if ($Format -eq 'standalone') { 'INSTRUCTIONS.md' } else { 'SYSTEM_PROMPT.md' }
+    $instructionSource = if ($Format -eq 'standalone') { $Inst } else { $Sysp }
+    $syspDest = Join-Path -Path $Target -ChildPath $instructionName
     $rulesDest = Join-Path -Path $Target -ChildPath 'RULES.md'
     $checkpointDest = Join-Path -Path $Target -ChildPath 'CHECKPOINT.md.template'
-    Copy-Item -Path $Sysp -Destination $syspDest -Force
+    Copy-Item -Path $instructionSource -Destination $syspDest -Force
     Copy-Item -Path $Rules -Destination $rulesDest -Force
     Copy-Item -Path $CheckpointTemplate -Destination $checkpointDest -Force
     Write-Host "    [copy]   $syspDest, $rulesDest, $checkpointDest"
@@ -165,6 +170,11 @@ Function Write-JsoncConfig {
     $localQuoted = "`"$($syspDest.Replace('\', '\\'))`""
     $permPathFwd = ($Target.Replace('\', '/') + '/*.md')
     $permPathBwd = ($Target + '\*.md')
+    $permPathTilde = ""
+    if ($Target.StartsWith($HomeDir)) {
+        $rel = $Target.Substring($HomeDir.Length).Replace('\', '/')
+        $permPathTilde = "~" + $rel + "/*.md"
+    }
 
     $extDirPattern = ""
     if ($Label -eq "global") {
@@ -176,7 +186,7 @@ Function Write-JsoncConfig {
         $content = Get-Content -Path $json -Raw
         $changed = $false
 
-        if ($content -match '"instructions"\s*:\s*\[[^\]]*"[A-Za-z]:\\(?!\\)') {
+        if (($content -match '"instructions"') -and -not $content.Contains($syspDest.Replace('\', '\\'))) {
             $start = $content.IndexOf('"instructions"')
             $end = $content.IndexOf(']', $start) + 1
             $newBlock = "`"instructions`": [`n    $localQuoted`n  ]"
@@ -201,10 +211,35 @@ Function Write-JsoncConfig {
             $changed = $true
         }
 
-        $hasPerm = $content.Contains($permPathFwd) -or $content.Contains($permPathBwd)
+        $hasPerm = ($content.Contains($permPathFwd) -or $content.Contains($permPathBwd)) -and (-not $permPathTilde -or $content.Contains($permPathTilde))
         if (-not $hasPerm) {
             $permStart = $content.IndexOf('"permission"')
-            if ($permStart -ge 0) {
+            $readIdx = if ($permStart -ge 0) { $content.IndexOf('"read"', $permStart) } else { -1 }
+            if ($readIdx -ge 0) {
+                $rbStart = $content.IndexOf('{', $readIdx)
+                if ($rbStart -ge 0) {
+                    $depth = 0; $rbEnd = -1
+                    for ($i = $rbStart; $i -lt $content.Length; $i++) {
+                        $c = $content[$i]
+                        if ($c -eq '{') { $depth++ }
+                        elseif ($c -eq '}') { $depth--; if ($depth -eq 0) { $rbEnd = $i; break } }
+                    }
+                    if ($rbEnd -gt 0) {
+                        $lineStart = $content.LastIndexOf("`n", $readIdx)
+                        $indent = $content.Substring($lineStart + 1, $readIdx - $lineStart - 1)
+                        $readRule = "`"read`": {`n$indent  `"$permPathFwd`": `"allow`""
+                        if ($permPathTilde) {
+                            $readRule += ",`n$indent  `"$permPathTilde`": `"allow`""
+                        }
+                        $readRule += "`n$indent}"
+                        # Keep original leading whitespace and trailing comma intact.
+                        $content = $content.Substring(0, $readIdx) + $readRule + $content.Substring($rbEnd + 1)
+                        $changed = $true
+                    }
+                }
+            }
+
+            if ($permStart -ge 0 -and $readIdx -lt 0) {
                 $braceStart = $content.IndexOf('{', $permStart)
                 if ($braceStart -ge 0) {
                     $depth = 0; $insertPos = -1
@@ -216,7 +251,11 @@ Function Write-JsoncConfig {
                     if ($insertPos -gt 0) {
                         $before = $content.Substring(0, $insertPos).TrimEnd()
                         $after = $content.Substring($insertPos)
-                        $readRule = "`"read`": {`n        `"$permPathFwd`": `"allow`"`n      }"
+                        $readRule = "`"read`": {`n        `"$permPathFwd`": `"allow`""
+                        if ($permPathTilde) {
+                            $readRule += ",`n        `"$permPathTilde`": `"allow`""
+                        }
+                        $readRule += "`n      }"
                         if ($before -match ',$') {
                             $content = $before + "`n      " + $readRule + "`n    " + $after
                         } else {
@@ -229,10 +268,15 @@ Function Write-JsoncConfig {
                 $lastBrace = $content.LastIndexOf('}')
                 $before = $content.Substring(0, $lastBrace).TrimEnd()
                 $after = $content.Substring($lastBrace)
+                $readRule = "`"read`": {`n        `"$permPathFwd`": `"allow`""
+                if ($permPathTilde) {
+                    $readRule += ",`n        `"$permPathTilde`": `"allow`""
+                }
+                $readRule += "`n      }"
                 if ($extDirPattern) {
-                    $permBlock = "`"permission`": {`n      `"read`": {`n        `"$permPathFwd`": `"allow`"`n      },`n      `"external_directory`": {`n        `"$extDirPattern`": `"allow`"`n      }`n    }"
+                    $permBlock = "`"permission`": {`n      $readRule,`n      `"external_directory`": {`n        `"$extDirPattern`": `"allow`"`n      }`n    }"
                 } else {
-                    $permBlock = "`"permission`": {`n      `"read`": {`n        `"$permPathFwd`": `"allow`"`n      }`n    }"
+                    $permBlock = "`"permission`": {`n      $readRule`n    }"
                 }
                 if ($before -match ',$') {
                     $content = $before + "`n  " + $permBlock + "`n" + $after
@@ -292,17 +336,20 @@ Function Write-JsoncConfig {
         }
     } else {
         $lspLine = if ($AddLsp) { "`n  `"lsp`": true," } else { "" }
+        $readBlock = "`"$permPathFwd`": `"allow`""
+        if ($permPathTilde) {
+            $readBlock += ",`n      `"$permPathTilde`": `"allow`""
+        }
         $content = "{
   `"instructions`": [
     $localQuoted
   ],$lspLine
   `"permission`": {
     `"read`": {
-      `"$permPathFwd`": `"allow`""
+      $readBlock
+    }"
         if ($extDirPattern) {
-            $content += "`n    },`n    `"external_directory`": {`n      `"$extDirPattern`": `"allow`"`n    }"
-        } else {
-            $content += "`n    }"
+            $content += ",`n    `"external_directory`": {`n      `"$extDirPattern`": `"allow`"`n    }"
         }
         $content += "`n  }`n}"
         Set-Content -Path $json -Value $content -Encoding UTF8
@@ -340,13 +387,24 @@ Function Install-AntigravityProject {
     param([string]$Target)
     $rulesDir = Join-Path -Path $Target -ChildPath '.agent\rules'
     New-DirectoryIfMissing -Path $rulesDir
-    $files = if ($Format -eq 'modular') { @('SYSTEM_PROMPT.md', 'RULES.md') } else { @('INSTRUCTIONS.md') }
+    $promptName = if ($Format -eq 'modular') { 'SYSTEM_PROMPT.md' } else { 'INSTRUCTIONS.md' }
+    $promptSource = if ($Format -eq 'modular') { $Sysp } else { $Inst }
+    $prompt = Join-Path -Path $rulesDir -ChildPath $promptName
+    if (Test-Path -Path $prompt -PathType Leaf) {
+        Write-Host "    [exists] $prompt"
+    } else {
+        $content = (Get-Content -Path $promptSource -Raw) -replace '\.agents/RULES\.md', "$rulesDir\RULES.md"
+        $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$rulesDir\CHECKPOINT.md.template"
+        Set-Content -Path $prompt -Value $content -Encoding UTF8
+        Write-Host "    [copy]   $prompt"
+    }
+    $files = @('RULES.md', 'CHECKPOINT.md.template')
     foreach ($f in $files) {
-        $link = Join-Path -Path $rulesDir -ChildPath $f
+      $link = Join-Path -Path $rulesDir -ChildPath $f
         if (Test-Path -Path $link) {
             Write-Host "    [exists] $link"
         } else {
-            $src = if ($f -eq 'INSTRUCTIONS.md') { $Inst } else { Join-Path -Path $CentralRoot -ChildPath ".agents\$f" }
+            $src = Join-Path -Path $CentralRoot -ChildPath ".agents\$f"
             try {
                 New-Item -ItemType SymbolicLink -Path $link -Target $src -ErrorAction Stop | Out-Null
                 Write-Host "    [link]   $link -> $src"
