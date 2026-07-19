@@ -127,14 +127,14 @@ Function Write-InstructBridge {
         Copy-Item -Path $Rules -Destination "$dir\RULES.md" -Force
         Copy-Item -Path $CheckpointTemplate -Destination "$dir\CHECKPOINT.md.template" -Force
         # Write SYSP content with marker header + path substitution
-        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Sysp -Raw) -replace '\.agents/RULES\.md', "$dir\RULES.md")
+        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Sysp -Raw) -replace '\[RULES_FILE\]|\.agents/RULES\.md', "$dir\RULES.md")
         $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template"
         Set-Content -Path $File -Value $content -Encoding UTF8
     } else {
         Copy-Item -Path $Rules -Destination "$dir\RULES.md" -Force
         Copy-Item -Path $CheckpointTemplate -Destination "$dir\CHECKPOINT.md.template" -Force
         # Write standalone instructions with local on-demand rules path.
-        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Inst -Raw) -replace '\.agents/RULES\.md', "$dir\RULES.md")
+        $content = "# AI Behavior Rules`r`n" + ((Get-Content -Path $Inst -Raw) -replace '\[RULES_FILE\]|\.agents/RULES\.md', "$dir\RULES.md")
         $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$dir\CHECKPOINT.md.template"
         Set-Content -Path $File -Value $content -Encoding UTF8
     }
@@ -158,7 +158,7 @@ Function Write-JsoncConfig {
     Copy-Item -Path $CheckpointTemplate -Destination $checkpointDest -Force
     Write-Host "    [copy]   $syspDest, $rulesDest, $checkpointDest"
 
-    (Get-Content $syspDest -Raw) -replace '\.agents/RULES\.md', $rulesDest | Set-Content $syspDest -NoNewline
+    (Get-Content $syspDest -Raw) -replace '\[RULES_FILE\]|\.agents/RULES\.md', $rulesDest | Set-Content $syspDest -NoNewline
     (Get-Content $syspDest -Raw) -replace '\.agents/CHECKPOINT\.md\.template', $checkpointDest | Set-Content $syspDest -NoNewline
 
     $localQuoted = "`"$($syspDest.Replace('\', '\\'))`""
@@ -372,7 +372,7 @@ Function Install-AntigravityProject {
     $promptName = if ($Format -eq 'modular') { 'SYSTEM_PROMPT.md' } else { 'INSTRUCTIONS.md' }
     $promptSource = if ($Format -eq 'modular') { $Sysp } else { $Inst }
     $prompt = Join-Path -Path $rulesDir -ChildPath $promptName
-    $content = (Get-Content -Path $promptSource -Raw) -replace '\.agents/RULES\.md', "$rulesDir\RULES.md"
+    $content = (Get-Content -Path $promptSource -Raw) -replace '\[RULES_FILE\]|\.agents/RULES\.md', "$rulesDir\RULES.md"
     $content = $content -replace '\.agents/CHECKPOINT\.md\.template', "$rulesDir\CHECKPOINT.md.template"
     Set-Content -Path $prompt -Value $content -Encoding UTF8
     Write-Host "    [copy]   $prompt"

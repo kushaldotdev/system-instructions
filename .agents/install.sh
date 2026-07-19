@@ -148,14 +148,16 @@ write_instruct_bridge() {
   if [ "$FORMAT" = "modular" ]; then
     # Write SYSP content with marker header + path substitution
     { echo "# AI Behavior Rules"
-      sed -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
+      sed -e "s|\[RULES_FILE\]|$dir/RULES.md|g" \
+          -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
           -e "s|\.agents/CHECKPOINT\.md\.template|$dir/CHECKPOINT.md.template|g" \
           "$SYSP"
     } > "$file"
   else
     # Write standalone instructions with local on-demand rules path.
     { echo "# AI Behavior Rules"
-      sed -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
+      sed -e "s|\[RULES_FILE\]|$dir/RULES.md|g" \
+          -e "s|\.agents/RULES\.md|$dir/RULES.md|g" \
           -e "s|\.agents/CHECKPOINT\.md\.template|$dir/CHECKPOINT.md.template|g" \
           "$INST"
     } > "$file"
@@ -183,7 +185,7 @@ jsonc_instructions() {
   cp -f "$CHECKPOINT_TEMPLATE" "$target/CHECKPOINT.md.template"
   echo "    [copy]   $instruction_dest, $target/RULES.md, $target/CHECKPOINT.md.template"
 
-  sed -i "s|\\.agents/RULES\\.md|$target/RULES.md|g" "$instruction_dest"
+  sed -i "s|\\[RULES_FILE\\]|$target/RULES.md|g; s|\\.agents/RULES\\.md|$target/RULES.md|g" "$instruction_dest"
   sed -i "s|\\.agents/CHECKPOINT\\.md\\.template|$target/CHECKPOINT.md.template|g" "$instruction_dest"
 
   local instruction_quoted="\"$instruction_dest\""
@@ -444,7 +446,8 @@ antigravity_project() {
   if [ "$FORMAT" = "modular" ]; then
     local prompt="$rules_dir/SYSTEM_PROMPT.md"
     if [ -L "$prompt" ]; then rm -f "$prompt"; fi
-    sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+    sed -e "s|\[RULES_FILE\]|$rules_dir/RULES.md|g" \
+        -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
         -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
         "$SYSP" > "$prompt"
     echo "    [copy]   $prompt"
@@ -461,7 +464,8 @@ antigravity_project() {
   else
     local prompt="$rules_dir/INSTRUCTIONS.md"
     if [ -L "$prompt" ]; then rm -f "$prompt"; fi
-    sed -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
+    sed -e "s|\[RULES_FILE\]|$rules_dir/RULES.md|g" \
+        -e "s|\.agents/RULES\.md|$rules_dir/RULES.md|g" \
         -e "s|\.agents/CHECKPOINT\.md\.template|$rules_dir/CHECKPOINT.md.template|g" \
         "$INST" > "$prompt"
     echo "    [copy]   $prompt"
