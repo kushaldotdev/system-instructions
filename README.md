@@ -2,7 +2,67 @@
 
 AI workflow rules for coding agents. Portable across opencode, Claude Code, Antigravity, Codex, and Cline.
 
-## Quick Start
+## OpenCode Custom Modes
+
+Portable custom agent configurations for OpenCode in the `opencode/` directory. Supports five specialized modes with per-mode model selection and permissions.
+
+### Configured Modes
+
+| Mode | Purpose | Model | Permissions |
+|------|---------|-------|-------------|
+| **`plan`** | Read-only planning | `cx/gpt-5.6-sol` | Edit `.md` only, bash ask |
+| **`test`** | Test authoring and validation | `ocg/glm-5.2` | Edit + bash allow |
+| **`build`** | Code implementation | `ocg/glm-5.2` | Edit allow, bash ask |
+| **`review`** | Architectural/security review | `cx/gpt-5.6-sol` | Edit deny, bash ask |
+| **`general`** | High-permission exploratory | `9router-antigravity/ag/gemini-3.5-flash-low` | Edit + bash allow |
+
+### Installation
+
+Separate scripts for separate locations. Choose global (all projects) or per-project install.
+
+**Linux / WSL:**
+```bash
+# Interactive (prompts for mode and project)
+bash opencode/install.sh
+
+# Global only
+bash opencode/install.sh --global
+
+# Project only
+bash opencode/install.sh --project ~/my-project
+```
+
+**Windows (PowerShell):**
+```powershell
+# Interactive
+.\opencode\install.ps1
+
+# Global only
+.\opencode\install.ps1 -Global
+
+# Project only
+.\opencode\install.ps1 -Project C:\projects\my-project
+```
+
+**Windows (Command Prompt):**
+```bat
+opencode\install.bat
+```
+
+### What Gets Installed
+
+| Scope | Target | Agent files | Config |
+|-------|--------|-------------|--------|
+| Global | `~/.config/opencode/` | `instructions.md`, `agents/*.md` | `opencode.jsonc` |
+| Project | `<project>/.opencode/` | `instructions.md`, `agents/*.md` | `opencode.jsonc` |
+
+Project install is skipped if a global config already exists (deep-merged: global config applies to all projects).
+
+### Cross-Environment (WSL + Windows)
+
+The Linux script detects WSL and also installs to Windows user profiles under `/mnt/c/Users/`. The PowerShell script detects WSL distros and installs to WSL home directories. Run either script to cover both environments.
+
+## Quick Start (Other Agents)
 
 ```bash
 # Clone once to a central location
