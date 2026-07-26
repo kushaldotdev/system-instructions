@@ -96,7 +96,7 @@ if os.path.exists(config_path):
         data = json.loads(cleaned)
     except Exception:
         data = {}
-    if 'instructions' not in data:
+    if 'instructions' not in data or not isinstance(data['instructions'], list):
         data['instructions'] = []
     if inst_path not in data['instructions']:
         data['instructions'].append(inst_path)
@@ -108,7 +108,7 @@ else:
     }
     action = 'create'
 
-if 'agent' not in data:
+if 'agent' not in data or not isinstance(data['agent'], dict):
     data['agent'] = {}
 data['agent'].update(agent_defs)
 

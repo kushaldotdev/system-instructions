@@ -1,7 +1,7 @@
 ---
 description: Custom Build/Implementation Agent
 mode: all
-model: ocg/glm-5.2
+model: 9router-opencode-go/ocg/glm-5.2
 permission:
   edit: allow
   bash: ask

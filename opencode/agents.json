@@ -1,7 +1,7 @@
 {
   "plan": {
     "mode": "all",
-    "model": "cx/gpt-5.6-sol",
+    "model": "9router-chatgpt/cx/gpt-5.6-sol",
     "permission": {
       "edit": { "*.md": "allow", "*": "deny" },
       "bash": "ask"
@@ -9,7 +9,7 @@
   },
   "test": {
     "mode": "all",
-    "model": "ocg/glm-5.2",
+    "model": "9router-opencode-go/ocg/glm-5.2",
     "permission": {
       "edit": "allow",
       "bash": "allow"
@@ -17,7 +17,7 @@
   },
   "build": {
     "mode": "all",
-    "model": "ocg/glm-5.2",
+    "model": "9router-opencode-go/ocg/glm-5.2",
     "permission": {
       "edit": "allow",
       "bash": "ask"
@@ -25,7 +25,7 @@
   },
   "review": {
     "mode": "all",
-    "model": "cx/gpt-5.6-sol",
+    "model": "9router-chatgpt/cx/gpt-5.6-sol",
     "permission": {
       "edit": "deny",
       "bash": "ask"

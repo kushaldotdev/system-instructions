@@ -1,7 +1,7 @@
 ---
 description: Custom Review Mode Agent
 mode: all
-model: cx/gpt-5.6-sol
+model: 9router-chatgpt/cx/gpt-5.6-sol
 permission:
   edit: deny
   bash: ask

@@ -102,7 +102,10 @@ Function Install-To {
             $data = [PSCustomObject]@{}
         }
 
-        if (-not ($data.PSObject.Properties.Name -contains 'instructions')) {
+        if (-not ($data.PSObject.Properties.Name -contains 'instructions') -or $data.instructions -isnot [array]) {
+            if ($data.PSObject.Properties.Name -contains 'instructions') {
+                $data.PSObject.Properties.Remove('instructions')
+            }
             $data | Add-Member -MemberType NoteProperty -Name 'instructions' -Value @()
         }
 
@@ -115,7 +118,10 @@ Function Install-To {
             $data.instructions += $normPath
         }
 
-        if (-not ($data.PSObject.Properties.Name -contains 'agent')) {
+        if (-not ($data.PSObject.Properties.Name -contains 'agent') -or $data.agent -isnot [PSCustomObject]) {
+            if ($data.PSObject.Properties.Name -contains 'agent') {
+                $data.PSObject.Properties.Remove('agent')
+            }
             $data | Add-Member -MemberType NoteProperty -Name 'agent' -Value ([PSCustomObject]@{})
         }
         foreach ($agentName in $agentDefsObj.PSObject.Properties.Name) {
