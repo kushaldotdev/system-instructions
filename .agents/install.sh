@@ -32,13 +32,13 @@ echo ""
 
 # === Interactive mode ===
 if [ -z "$MODE" ]; then
-  echo "Install mode:"
+  echo "Install mode (default: global):"
   echo "  g) Global -- applies to ALL projects on this machine"
   echo "  p) Project -- bridges in a specific project"
   echo "  b) Both"
   echo "  q) Quit"
-  read -p "Choice (g/p/b/q): " mc
-  case "$mc" in g|G) MODE="global" ;; p|P) MODE="project" ;; b|B) MODE="both" ;; q|Q) exit 0 ;; *) echo "Invalid"; exit 1 ;; esac
+  read -p "Choice (g/p/b/q) [default: g]: " mc
+  case "$mc" in ""|g|G) MODE="global" ;; p|P) MODE="project" ;; b|B) MODE="both" ;; q|Q) exit 0 ;; *) echo "Invalid"; exit 1 ;; esac
 fi
 
 # === Project dir ===
@@ -93,14 +93,14 @@ esac
 
 # === LSP for opencode ===
 echo ""
-echo "Enable LSP for opencode? (y/N):"
-echo "  LSP provides diagnostics and symbol intelligence when reading files."
-echo "  Note: adds small token overhead (diagnostic messages per file)."
-read -p "Choice (y/N): " lsp_choice
-case "$lsp_choice" in
-  y|Y|yes|Yes) LSP_ENABLED=true ;;
-  *) LSP_ENABLED=false ;;
-esac
+  echo "Enable LSP for opencode? (Y/n):"
+  echo "  LSP provides diagnostics and symbol intelligence when reading files."
+  echo "  Note: adds small token overhead (diagnostic messages per file)."
+  read -p "Choice (Y/n) [default: Y]: " lsp_choice
+  case "$lsp_choice" in
+    n|N|no|No) LSP_ENABLED=false ;;
+    *) LSP_ENABLED=true ;;
+  esac
 
 # === Global detection ===
 global_path_for_tool() {
@@ -588,9 +588,9 @@ done
 # Disable Claude Code compatibility in OpenCode by default
 if [[ " $selection " =~ " 1 " ]] && { [ "$MODE" = "global" ] || [ "$MODE" = "both" ]; }; then
   echo ""
-  echo "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+  echo "Disable Claude Code compatibility prompt in OpenCode? (Y/n) [default: Y]:"
   echo "  Recommended to avoid conflicting rule definitions between agents."
-  read -p "Choice (Y/n): " disable_choice
+  read -p "Choice (Y/n) [default: Y]: " disable_choice
   case "$disable_choice" in
     n|N|no|No)
       echo "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."

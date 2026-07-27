@@ -28,13 +28,14 @@ Write-Host ""
 
 # --- mode ---
 if (-not $Global -and [string]::IsNullOrEmpty($Project)) {
-    Write-Host "Install mode:"
+    Write-Host "Install mode (default: global):"
     Write-Host "  g) Global -- applies to ALL projects on this machine"
     Write-Host "  p) Project -- bridges in a specific project"
     Write-Host "  b) Both"
     Write-Host "  q) Quit"
-    $mc = Read-Host "Choice (g/p/b/q)"
+    $mc = Read-Host "Choice (g/p/b/q) [default: g]"
     switch -regex ($mc) {
+        '^$' { $Mode = 'global' }
         '^[gG]$' { $Mode = 'global' }
         '^[pP]$' { $Mode = 'project' }
         '^[bB]$' { $Mode = 'both' }
@@ -82,11 +83,11 @@ switch -regex ($fmt) {
 
 # --- LSP for opencode ---
 Write-Host ""
-Write-Host "Enable LSP for opencode? (y/N):"
+Write-Host "Enable LSP for opencode? (Y/n):"
 Write-Host "  LSP provides diagnostics and symbol intelligence when reading files."
 Write-Host "  Note: adds small token overhead (diagnostic messages per file)."
-$lspInput = Read-Host "Choice (y/N)"
-if ($lspInput -match '^[yY]') { $LspEnabled = $true } else { $LspEnabled = $false }
+$lspInput = Read-Host "Choice (Y/n) [default: Y]"
+if ($lspInput -match '^[nN]') { $LspEnabled = $false } else { $LspEnabled = $true }
 
 # --- tool selection ---
 Write-Host ""
@@ -484,9 +485,9 @@ foreach ($sel in $selection) {
 # Disable Claude Code compatibility in OpenCode by default
 if (($selection -contains '1') -and ($runGlobal)) {
     Write-Host ""
-    Write-Host "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+    Write-Host "Disable Claude Code compatibility prompt in OpenCode? (Y/n) [default: Y]:"
     Write-Host "  Recommended to avoid conflicting rule definitions between agents."
-    $disableInput = Read-Host "Choice (Y/n)"
+    $disableInput = Read-Host "Choice (Y/n) [default: Y]"
     if ($disableInput -match '^[nN]') {
         Write-Host "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."
         [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', $null, 'User')
