@@ -99,45 +99,91 @@ lsp_enabled = os.environ.get('OP_LSP_ENABLED', 'false').lower() == 'true'
 
 agents_json_path = os.path.join(script_dir, 'agents.json')
 with open(agents_json_path, 'r') as f:
-    agent_defs = json.load(f)
+    agents_raw = f.read().strip()
 
+first_brace = -1
 if os.path.exists(config_path):
     with open(config_path, 'r') as f:
         raw = f.read()
-    cleaned = re.sub(
-        r'"(?:\\.|[^"\\])*"|(//[^\n]*\n?|/\*.*?\*/)',
-        lambda m: '' if m.group(1) else m.group(0),
-        raw,
-        flags=re.S
-    )
-    cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
-    try:
-        data = json.loads(cleaned)
-    except Exception:
-        data = {}
-    if 'instructions' not in data or not isinstance(data['instructions'], list):
-        data['instructions'] = []
-    if inst_path not in data['instructions']:
-        data['instructions'].append(inst_path)
-    action = 'update'
+    first_brace = raw.find('{')
+
+if first_brace >= 0:
+    content = raw
+    changed = False
+
+    # 1. Update instructions
+    if inst_path not in content:
+        match = re.search(r'"instructions"\s*:\s*\[', content)
+        if match:
+            pos = match.end()
+            content = content[:pos] + f'\n    "{inst_path}",' + content[pos:]
+            changed = True
+        else:
+            pos = first_brace + 1
+            content = content[:pos] + f'\n  "instructions": [\n    "{inst_path}"\n  ],' + content[pos:]
+            changed = True
+
+    # 2. Update lsp
+    if lsp_enabled:
+        match = re.search(r'"lsp"\s*:\s*(true|false)', content)
+        if match:
+            content = content[:match.start()] + '"lsp": true' + content[match.end():]
+            changed = True
+        else:
+            pos = first_brace + 1
+            content = content[:pos] + '\n  "lsp": true,' + content[pos:]
+            changed = True
+    else:
+        match = re.search(r'"lsp"\s*:\s*(true|false),?\s*', content)
+        if match:
+            content = content[:match.start()] + content[match.end():]
+            changed = True
+
+    # 3. Update agent
+    match = re.search(r'"agent"\s*:\s*\{', content)
+    if match:
+        brace_start = content.find('{', match.start())
+        depth = 0
+        brace_end = -1
+        for i in range(brace_start, len(content)):
+            c = content[i]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+                if depth == 0:
+                    brace_end = i
+                    break
+        if brace_end > 0:
+            new_agent_block = f'"agent": {agents_raw}'
+            content = content[:match.start()] + new_agent_block + content[brace_end + 1:]
+            changed = True
+    else:
+        pos = first_brace + 1
+        content = content[:pos] + f'\n  "agent": {agents_raw},' + content[pos:]
+        changed = True
+
+    if changed:
+        with open(config_path, 'w') as f:
+            f.write(content)
+        print(f'    [update] {config_path}')
+    else:
+        print(f'    [skip]   {config_path} (no changes needed)')
 else:
-    data = {
-        '$schema': 'https://opencode.ai/config.json',
-        'instructions': [inst_path]
-    }
-    action = 'create'
-
-if lsp_enabled:
-    data['lsp'] = True
-
-if 'agent' not in data or not isinstance(data['agent'], dict):
-    data['agent'] = {}
-data['agent'].update(agent_defs)
-
-with open(config_path, 'w') as f:
-    json.dump(data, f, indent=2)
-
-print(f'    [{action}] {config_path}')
+    new_json = [
+        '{',
+        '  "$schema": "https://opencode.ai/config.json",',
+        '  "instructions": [',
+        f'    "{inst_path}"',
+        '  ],'
+    ]
+    if lsp_enabled:
+        new_json.append('  "lsp": true,')
+    new_json.append(f'  "agent": {agents_raw}')
+    new_json.append('}')
+    with open(config_path, 'w') as f:
+        f.write('\n'.join(new_json))
+    print(f'    [create] {config_path}')
 PYEOF
 }
 

@@ -99,74 +99,102 @@ Function Install-To {
     $agentsJson = Join-Path $ScriptDir "agents.json"
     $agentDefsObj = Get-Content -Path $agentsJson -Raw | ConvertFrom-Json
 
+    $firstBrace = -1
     if (Test-Path -Path $config -PathType Leaf) {
         $raw = Get-Content -Path $config -Raw
-        $cleaned = [regex]::Replace($raw,
-            '"(?:[^"\\]|\\.)*"|(//[^\r\n]*\r?\n?|/\*.*?\*/)',
-            {
-                param($m)
-                if ($m.Groups[1].Success) { return '' } else { return $m.Value }
-            },
-            [System.Text.RegularExpressions.RegexOptions]::Singleline
-        )
-        $cleaned = $cleaned -replace ',(\s*[}\]])', '$1'
-        try {
-            $data = $cleaned | ConvertFrom-Json
-        } catch {
-            $data = [PSCustomObject]@{}
-        }
+        $firstBrace = $raw.IndexOf('{')
+    }
 
-        if (-not ($data.PSObject.Properties.Name -contains 'instructions') -or $data.instructions -isnot [array]) {
-            if ($data.PSObject.Properties.Name -contains 'instructions') {
-                $data.PSObject.Properties.Remove('instructions')
-            }
-            $data | Add-Member -MemberType NoteProperty -Name 'instructions' -Value @()
-        }
+    if ($firstBrace -ge 0) {
+        $content = $raw
+        $changed = $false
 
+        # 1. Update instructions
         $normPath = $instructionsDst.Replace('\', '/')
-        $found = $false
-        foreach ($p in $data.instructions) {
-            if ($p -replace '\\', '/' -eq $normPath) { $found = $true; break }
-        }
-        if (-not $found) {
-            $data.instructions += $normPath
+        if ($content -notmatch [regex]::Escape($normPath)) {
+            $instMatch = [regex]::Match($content, '"instructions"\s*:\s*\[')
+            if ($instMatch.Success) {
+                $pos = $instMatch.Index + $instMatch.Length
+                $content = $content.Substring(0, $pos) + "`r`n    `"$normPath`"," + $content.Substring($pos)
+                $changed = $true
+            } else {
+                $pos = $firstBrace + 1
+                $content = $content.Substring(0, $pos) + "`r`n  `"instructions`": [`r`n    `"$normPath`"`r`n  ]," + $content.Substring($pos)
+                $changed = $true
+            }
         }
 
-        if (-not ($data.PSObject.Properties.Name -contains 'agent') -or $data.agent -isnot [PSCustomObject]) {
-            if ($data.PSObject.Properties.Name -contains 'agent') {
-                $data.PSObject.Properties.Remove('agent')
-            }
-            $data | Add-Member -MemberType NoteProperty -Name 'agent' -Value ([PSCustomObject]@{})
-        }
-        foreach ($agentName in $agentDefsObj.PSObject.Properties.Name) {
-            if ($data.agent.PSObject.Properties.Name -contains $agentName) {
-                $data.agent.PSObject.Properties.Remove($agentName)
-            }
-            $data.agent | Add-Member -MemberType NoteProperty -Name $agentName -Value $agentDefsObj.$agentName
-        }
-
-        if ($data.PSObject.Properties.Name -contains 'lsp') {
-            $data.PSObject.Properties.Remove('lsp')
-        }
+        # 2. Update lsp
         if ($LspEnabled) {
-            $data | Add-Member -MemberType NoteProperty -Name 'lsp' -Value $true
+            $lspMatch = [regex]::Match($content, '"lsp"\s*:\s*(true|false)')
+            if ($lspMatch.Success) {
+                $content = $content.Substring(0, $lspMatch.Index) + "`"lsp`": true" + $content.Substring($lspMatch.Index + $lspMatch.Length)
+                $changed = $true
+            } else {
+                $pos = $firstBrace + 1
+                $content = $content.Substring(0, $pos) + "`r`n  `"lsp`": true," + $content.Substring($pos)
+                $changed = $true
+            }
+        } else {
+            $lspMatch = [regex]::Match($content, '"lsp"\s*:\s*(true|false),?\s*')
+            if ($lspMatch.Success) {
+                $content = $content.Substring(0, $lspMatch.Index) + $content.Substring($lspMatch.Index + $lspMatch.Length)
+                $changed = $true
+            }
         }
 
-        $updatedJson = ConvertTo-Json -InputObject $data -Depth 10
-        Set-Content -Path $config -Value $updatedJson -Encoding UTF8
-        Write-Host "    [update] $config"
+        # 3. Update agent
+        $agentsRaw = Get-Content -Path $agentsJson -Raw
+        $agentMatch = [regex]::Match($content, '"agent"\s*:\s*\{')
+        if ($agentMatch.Success) {
+            $braceStart = $content.IndexOf('{', $agentMatch.Index)
+            $depth = 0
+            $braceEnd = -1
+            for ($i = $braceStart; $i -lt $content.Length; $i++) {
+                $c = $content[$i]
+                if ($c -eq '{') { $depth++ }
+                elseif ($c -eq '}') {
+                    $depth--
+                    if ($depth -eq 0) {
+                        $braceEnd = $i
+                        break
+                    }
+                }
+            }
+            if ($braceEnd -gt 0) {
+                $newAgentBlock = "`"agent`": " + $agentsRaw.Trim()
+                $content = $content.Substring(0, $agentMatch.Index) + $newAgentBlock + $content.Substring($braceEnd + 1)
+                $changed = $true
+            }
+        } else {
+            $pos = $firstBrace + 1
+            $content = $content.Substring(0, $pos) + "`r`n  `"agent`": " + $agentsRaw.Trim() + "," + $content.Substring($pos)
+            $changed = $true
+        }
+
+        if ($changed) {
+            Set-Content -Path $config -Value $content -Encoding UTF8
+            Write-Host "    [update] $config"
+        } else {
+            Write-Host "    [skip]   $config (no changes needed)"
+        }
     } else {
         $normPath = $instructionsDst.Replace('\', '/')
-        $newData = [PSCustomObject]@{
-            '$schema' = 'https://opencode.ai/config.json'
-            instructions = @($normPath)
-        }
+        $agentsRaw = Get-Content -Path $agentsJson -Raw
+        $newJson = @(
+            "{"
+            "  `"`$schema`": `"https://opencode.ai/config.json`","
+            "  `"instructions`": ["
+            "    `"$normPath`""
+            "  ],"
+        )
         if ($LspEnabled) {
-            $newData | Add-Member -MemberType NoteProperty -Name 'lsp' -Value $true
+            $newJson += "  `"lsp`": true,"
         }
-        $newData | Add-Member -MemberType NoteProperty -Name 'agent' -Value $agentDefsObj
-        $newJson = ConvertTo-Json -InputObject $newData -Depth 10
-        Set-Content -Path $config -Value $newJson -Encoding UTF8
+        $newJson += "  `"agent`": " + $agentsRaw.Trim()
+        $newJson += "}"
+        $newJsonString = $newJson -join "`r`n"
+        Set-Content -Path $config -Value $newJsonString -Encoding UTF8
         Write-Host "    [create] $config"
     }
 }
