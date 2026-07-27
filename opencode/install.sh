@@ -7,12 +7,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODE=""
 PROJECT_DIR=""
 NO_PAUSE=false
+LSP_ENABLED=false
+NO_PROMPT=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --global) MODE="global"; shift ;;
     --project) MODE="project"; shift; PROJECT_DIR="${1:-}"; [ -z "$PROJECT_DIR" ] && { echo "Usage: --project <dir>"; exit 1; }; shift ;;
     --no-pause) NO_PAUSE=true; shift ;;
-    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>] [--no-pause]"; exit 0 ;; 
+    --lsp) LSP_ENABLED=true; shift ;;
+    --no-prompt) NO_PROMPT=true; shift ;;
+    --help|-h) echo "Usage: bash install.sh [--global|--project <dir>] [--lsp] [--no-pause] [--no-prompt]"; exit 0 ;;
     *) echo "Unknown: $1"; exit 1 ;;
   esac
 done
@@ -31,6 +35,19 @@ if [ -z "$MODE" ]; then
   echo "  q) Quit"
   read -p "Choice (g/p/b/q): " mc
   case "$mc" in g|G) MODE="global" ;; p|P) MODE="project" ;; b|B) MODE="both" ;; q|Q) exit 0 ;; *) echo "Invalid"; exit 1 ;; esac
+fi
+
+# === LSP for opencode (only if interactive and not already set by arg) ===
+if [ "$NO_PROMPT" != true ] && [ -t 0 ] && [ "$LSP_ENABLED" = false ]; then
+  echo ""
+  echo "Enable LSP for opencode? (y/N):"
+  echo "  LSP provides diagnostics and symbol intelligence when reading files."
+  echo "  Note: adds small token overhead (diagnostic messages per file)."
+  read -p "Choice (y/N): " lsp_choice
+  case "$lsp_choice" in
+    y|Y|yes|Yes) LSP_ENABLED=true ;;
+    *) LSP_ENABLED=false ;;
+  esac
 fi
 
 # === Project dir ===
@@ -70,6 +87,7 @@ install_to() {
   export OP_INST_PATH="$inst_path"
   export OP_CONFIG="$config"
   export OP_SCRIPT_DIR="$SCRIPT_DIR"
+  export OP_LSP_ENABLED="$LSP_ENABLED"
   python3 << 'PYEOF'
 import json, re, os
 
@@ -77,6 +95,7 @@ target = os.environ['OP_TARGET']
 inst_path = os.environ['OP_INST_PATH']
 config_path = os.environ['OP_CONFIG']
 script_dir = os.environ['OP_SCRIPT_DIR']
+lsp_enabled = os.environ.get('OP_LSP_ENABLED', 'false').lower() == 'true'
 
 agents_json_path = os.path.join(script_dir, 'agents.json')
 with open(agents_json_path, 'r') as f:
@@ -107,6 +126,9 @@ else:
         'instructions': [inst_path]
     }
     action = 'create'
+
+if lsp_enabled:
+    data['lsp'] = True
 
 if 'agent' not in data or not isinstance(data['agent'], dict):
     data['agent'] = {}
@@ -159,9 +181,48 @@ if [ "$MODE" = "project" ] || [ "$MODE" = "both" ]; then
   project_install "$PROJECT_DIR"
 fi
 
+# Disable Claude Code compatibility in OpenCode by default
+if [ "$NO_PROMPT" != true ] && { [ "$MODE" = "global" ] || [ "$MODE" = "both" ]; }; then
+  if [ -t 0 ]; then
+    echo ""
+    echo "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+    echo "  Recommended to avoid conflicting rule definitions between agents."
+    read -p "Choice (Y/n): " disable_choice
+    case "$disable_choice" in
+      n|N|no|No)
+        echo "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."
+        for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+          if [ -f "$profile" ]; then
+            if grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
+              sed -i '/OPENCODE_DISABLE_CLAUDE_CODE_PROMPT/d' "$profile"
+              echo "    Removed from $profile"
+            else
+              echo "    Already clean in $profile"
+            fi
+          fi
+        done
+        ;;
+      *)
+        echo "  Disabling Claude Code compatibility for OpenCode..."
+        for profile in "$HOME/.bashrc" "$HOME/.zshrc"; do
+          if [ -f "$profile" ]; then
+            if ! grep -q "OPENCODE_DISABLE_CLAUDE_CODE_PROMPT" "$profile"; then
+              echo 'export OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true' >> "$profile"
+              echo "    Added to $profile"
+            else
+              echo "    Already configured in $profile"
+            fi
+          fi
+        done
+        ;;
+    esac
+  fi
+fi
+
 echo ""
 echo "=== Done ==="
 echo "  Please quit and restart opencode for changes to take effect."
+echo "  LSP: $([ "$LSP_ENABLED" = true ] && echo "enabled" || echo "disabled")"
 
 if [ -t 0 ] && [ "$NO_PAUSE" != "true" ]; then
   echo ""

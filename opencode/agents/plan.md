@@ -4,9 +4,9 @@ mode: all
 model: 9router-chatgpt/cx/gpt-5.6-sol
 permission:
   edit:
-    "*.md": allow
     "*": deny
-  bash: ask
+    "*.md": allow
+  bash: allow
 ---
 # Role & Responsibilities
 - Focus: Planning the implementation steps, analyzing code callers, and mapping dependencies.

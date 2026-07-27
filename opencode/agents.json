@@ -3,8 +3,11 @@
     "mode": "all",
     "model": "9router-chatgpt/cx/gpt-5.6-sol",
     "permission": {
-      "edit": { "*.md": "allow", "*": "deny" },
-      "bash": "ask"
+      "edit": {
+        "*": "deny",
+        "*.md": "allow"
+      },
+      "bash": "allow"
     }
   },
   "test": {
@@ -20,15 +23,18 @@
     "model": "9router-opencode-go/ocg/glm-5.2",
     "permission": {
       "edit": "allow",
-      "bash": "ask"
+      "bash": "allow"
     }
   },
   "review": {
     "mode": "all",
     "model": "9router-chatgpt/cx/gpt-5.6-sol",
     "permission": {
-      "edit": "deny",
-      "bash": "ask"
+      "edit": {
+        "*": "deny",
+        "*.md": "allow"
+      },
+      "bash": "allow"
     }
   },
   "general": {

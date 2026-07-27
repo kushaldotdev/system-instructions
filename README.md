@@ -10,10 +10,10 @@ Portable custom agent configurations for OpenCode in the `opencode/` directory. 
 
 | Mode | Purpose | Model | Permissions |
 |------|---------|-------|-------------|
-| **`plan`** | Read-only planning | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash ask |
+| **`plan`** | Read-only planning | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
 | **`test`** | Test authoring and validation | `9router-opencode-go/ocg/glm-5.2` | Edit + bash allow |
-| **`build`** | Code implementation | `9router-opencode-go/ocg/glm-5.2` | Edit allow, bash ask |
-| **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Edit deny, bash ask |
+| **`build`** | Code implementation | `9router-opencode-go/ocg/glm-5.2` | Edit allow, bash allow |
+| **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
 | **`general`** | High-permission exploratory | `9router-antigravity/ag/gemini-3.5-flash-low` | Edit + bash allow |
 
 ### Installation

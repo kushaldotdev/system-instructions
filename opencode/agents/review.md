@@ -3,8 +3,10 @@ description: Custom Review Mode Agent
 mode: all
 model: 9router-chatgpt/cx/gpt-5.6-sol
 permission:
-  edit: deny
-  bash: ask
+  edit:
+    "*": deny
+    "*.md": allow
+  bash: allow
 ---
 # Role & Responsibilities
 - Focus: Reviewing code changes for architectural alignment, security boundaries, correctness, readability, and testing coverage.

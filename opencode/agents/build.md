@@ -4,7 +4,7 @@ mode: all
 model: 9router-opencode-go/ocg/glm-5.2
 permission:
   edit: allow
-  bash: ask
+  bash: allow
 ---
 # Role & Responsibilities
 - Focus: Implement requested features, fix bugs, apply refactoring, and update codebase functionality.

@@ -14,6 +14,11 @@ Drop articles/pronouns when clear. Full sentences only for safety, ambiguity, ir
   2. **Transition**: The user will manually transition the agent/mode to the implementation phase.
   3. **Build**: Run test cases first (in `test` mode), then write the code and build (in `build` mode), and perform self-review.
   4. **Review & Fix**: Once all task/todo list items are completed, launch a subagent using the `review` mode to check the code. If the review surfaces issues, launch a subagent using the `build` mode to fix them. Repeat until no issues remain.
+- **Review Phase Requirements**:
+  - The review subagent must run in `review` mode.
+  - The review output must be written to `.agents/review/YYYY-MM-DD-<descriptive-kebab-case-slug>.md` using the exact format: `file:line | severity | impact` for findings, followed by overall verdict (pass/fail).
+  - The review output file location must be configured or generated dynamically matching the current task's slug.
+  - If issues are found, they must be resolved in a subsequent `build` task before running another `review` subagent.
 
 # Work Mode
 Default `[Plan]`. Use `[Review]` or `[Implement]`; `/plan`, `/review`, `/do` switch mode.

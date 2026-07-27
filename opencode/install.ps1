@@ -1,7 +1,9 @@
 #Requires -Version 5.1
 param(
     [switch]$Global,
-    [string]$Project
+    [string]$Project,
+    [switch]$Lsp,
+    [switch]$NoPrompt
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +13,7 @@ $HomeDir = $env:USERPROFILE
 
 $Mode = ''
 $ProjectDir = ''
+$LspEnabled = $Lsp
 
 Write-Host "============================================"
 Write-Host "  opencode Custom Modes Installer"
@@ -37,6 +40,16 @@ if (-not $Global -and [string]::IsNullOrEmpty($Project)) {
 } elseif (-not [string]::IsNullOrEmpty($Project)) {
     $Mode = 'project'
     $ProjectDir = $Project
+}
+
+# --- LSP for opencode (only if interactive and not already set by arg) ---
+if (-not $NoPrompt -and [Environment]::UserInteractive -and -not $Lsp) {
+    Write-Host ""
+    Write-Host "Enable LSP for opencode? (y/N):"
+    Write-Host "  LSP provides diagnostics and symbol intelligence when reading files."
+    Write-Host "  Note: adds small token overhead (diagnostic messages per file)."
+    $lspInput = Read-Host "Choice (y/N)"
+    if ($lspInput -match '^[yY]') { $LspEnabled = $true } else { $LspEnabled = $false }
 }
 
 # --- project dir ---
@@ -131,6 +144,13 @@ Function Install-To {
             $data.agent | Add-Member -MemberType NoteProperty -Name $agentName -Value $agentDefsObj.$agentName
         }
 
+        if ($data.PSObject.Properties.Name -contains 'lsp') {
+            $data.PSObject.Properties.Remove('lsp')
+        }
+        if ($LspEnabled) {
+            $data | Add-Member -MemberType NoteProperty -Name 'lsp' -Value $true
+        }
+
         $updatedJson = ConvertTo-Json -InputObject $data -Depth 10
         Set-Content -Path $config -Value $updatedJson -Encoding UTF8
         Write-Host "    [update] $config"
@@ -139,8 +159,11 @@ Function Install-To {
         $newData = [PSCustomObject]@{
             '$schema' = 'https://opencode.ai/config.json'
             instructions = @($normPath)
-            agent = $agentDefsObj
         }
+        if ($LspEnabled) {
+            $newData | Add-Member -MemberType NoteProperty -Name 'lsp' -Value $true
+        }
+        $newData | Add-Member -MemberType NoteProperty -Name 'agent' -Value $agentDefsObj
         $newJson = ConvertTo-Json -InputObject $newData -Depth 10
         Set-Content -Path $config -Value $newJson -Encoding UTF8
         Write-Host "    [create] $config"
@@ -195,10 +218,29 @@ $runProject = ($Mode -eq 'project' -or $Mode -eq 'both')
 if ($runGlobal) { Install-Global }
 if ($runProject) { Install-Project -Target $ProjectDir }
 
+# Disable Claude Code compatibility in OpenCode by default
+if (-not $NoPrompt -and ($runGlobal) -and ([Environment]::UserInteractive)) {
+    Write-Host ""
+    Write-Host "Disable Claude Code compatibility prompt in OpenCode? (Y/n):"
+    Write-Host "  Recommended to avoid conflicting rule definitions between agents."
+    $disableInput = Read-Host "Choice (Y/n)"
+    if ($disableInput -match '^[nN]') {
+        Write-Host "  Enabling Claude Code compatibility for OpenCode (cleaning up old configs)..."
+        [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', $null, 'User')
+        Write-Host "    Deleted User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT"
+    } else {
+        Write-Host "  Disabling Claude Code compatibility for OpenCode in Windows environment..."
+        [System.Environment]::SetEnvironmentVariable('OPENCODE_DISABLE_CLAUDE_CODE_PROMPT', 'true', 'User')
+        Write-Host "    Set User environment variable: OPENCODE_DISABLE_CLAUDE_CODE_PROMPT=true"
+    }
+}
+
 Write-Host ""
 Write-Host "========================="
 Write-Host "  Done!"
 Write-Host "  Please quit and restart opencode for changes to take effect."
 if ($runGlobal) { Write-Host "  Global: $HomeDir\.config\opencode\" }
 if ($runProject) { Write-Host "  Project: $ProjectDir\.opencode\" }
+$lspStatus = if ($LspEnabled) { "enabled" } else { "disabled" }
+Write-Host "  LSP: $lspStatus"
 Write-Host "========================="
