@@ -21,13 +21,20 @@ shared exhaustive-review skill.
 
 ### Installation
 
-Run the same dependency-free Python 3.10+ installer in the environment where
-OpenCode runs. It never discovers or modifies another operating environment.
+Run the same dependency-free Python 3.10+ installer from Windows or WSL. Choose
+the current environment, the other environment, or both. Cross-environment
+installation delegates to the target environment's own Python so home paths,
+locking, config paths, and OpenCode validation remain native.
 
 **Linux / WSL:**
 ```bash
 # Interactive (prompts for mode and project)
 python3 opencode/install.py
+
+# Choose WSL, Windows, or both environments
+python3 opencode/install.py --environment current --global
+python3 opencode/install.py --environment windows --global
+python3 opencode/install.py --environment both --global
 
 # Global only
 python3 opencode/install.py --global
@@ -48,6 +55,14 @@ python3 opencode/install.py --global --no-lsp
 # Interactive
 py -3 opencode\install.py
 
+# Choose Windows, WSL, or both environments
+py -3 opencode\install.py --environment current --global
+py -3 opencode\install.py --environment wsl --global
+py -3 opencode\install.py --environment both --global
+
+# Select a non-default WSL distribution
+py -3 opencode\install.py --environment wsl --wsl-distro Ubuntu-24.04 --global
+
 # Global only
 py -3 opencode\install.py --global
 
@@ -58,10 +73,35 @@ py -3 opencode\install.py --project C:\projects\my-project
 py -3 opencode\install.py --both
 ```
 
-Windows requires Python 3.10+ through `py -3` or an equivalent Python command.
-WSL installation must be run from WSL; Windows installation must be run from
-Windows. Each invocation uses that Python process's home directory and path
-semantics.
+Environment selection is independent from install scope:
+
+| Option | Meaning |
+|---|---|
+| `--environment current` | Install only where `install.py` is running |
+| `--environment windows` | Install in Windows; available from Windows or WSL |
+| `--environment wsl` | Install in WSL; available from WSL or Windows |
+| `--environment both` | Install in both Windows and WSL |
+| `--global` | Install globally in each selected environment |
+| `--project <path>` | Install for the project, converting the caller-native path for the other environment |
+| `--both` | Install global plus project scope; unrelated to `--environment both` |
+
+Cross-target prerequisites:
+
+- WSL to Windows: Windows Python 3.10+ installed under the current user's
+  `%LOCALAPPDATA%` (the standard WindowsApps `py.exe`, Python launcher, or
+  Python install layout), plus normal WSL interoperability and
+  `/usr/bin/wslpath`. WSL normally provides that path as a trusted symlink to
+  its root-owned `/init` runtime; the installer accepts that standard layout.
+- Windows to WSL: `wsl.exe` and Python 3.10+ in the selected/default WSL
+  distribution.
+- `--wsl-distro <name>` selects a distribution; otherwise the Windows default
+  WSL distribution is resolved once and pinned for conversion and execution.
+- Enter `--project` in the launching environment's native path format. The
+  installer converts it before delegation.
+
+Without `--environment`, interactive Windows/WSL runs prompt for current,
+other, or both. Non-interactive runs default to `current`. Native Linux supports
+only `current`.
 
 ### What Gets Installed
 
@@ -77,14 +117,23 @@ current LSP configuration. JSONC comments/formatting may be normalized; the
 timestamped pre-change backup retains original bytes. Repeated installation is
 idempotent.
 
+Each scope and environment is an independent idempotent install. A completed
+target remains installed if a later target fails; fix the reported prerequisite
+or validation error and rerun to reconcile the remaining target. Transport
+failure after remote execution can make remote completion ambiguous, but rerun
+is safe. Atomic replacement protects individual files; the installer does not
+claim one all-or-nothing transaction across multiple files, scopes, or operating
+environments. A hard process kill can therefore require a rerun.
+
 Installer validates resolved config, skill discovery, and both review agents
 with `opencode debug` when OpenCode is available. Quit and restart OpenCode after
 installation because configuration-time files are not hot-reloaded.
 
 One implementation handles JSONC parsing, semantic config merge, backups,
-locking, atomic replacement, managed-file rollback, and runtime discovery on
-both Windows and WSL. No Node package, PowerShell script, shell installer, or
-third-party Python package is required.
+cooperative shared-target locking, atomic replacement, per-target rollback,
+hash-verified isolated cross-environment delegation, and side-effect-controlled
+runtime discovery on both Windows and WSL. No Node package,
+PowerShell script, shell installer, or third-party Python package is required.
 
 ### Review Workflow
 
