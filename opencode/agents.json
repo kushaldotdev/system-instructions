@@ -32,7 +32,20 @@
     "permission": {
       "edit": {
         "*": "deny",
-        "*.md": "allow"
+        ".agents/review/**": "allow",
+        "**/.agents/review/**": "allow"
+      },
+      "bash": "allow"
+    }
+  },
+  "audit": {
+    "mode": "all",
+    "model": "9router-chatgpt/cx/gpt-5.6-sol",
+    "permission": {
+      "edit": {
+        "*": "deny",
+        ".agents/review/**": "allow",
+        "**/.agents/review/**": "allow"
       },
       "bash": "allow"
     }

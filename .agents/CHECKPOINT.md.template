@@ -1,7 +1,7 @@
 # Checkpoint: <slug>
 
 ## Plan
-`.agents/plan/YYYY-MM-DD-<slug>.md` or `No persisted plan file`
+`.agents/plan/YYYY-MM-DD-HH-MM-SS-<slug>.md` or `No persisted plan file`
 
 ## Goal
 <what the session is trying to achieve>

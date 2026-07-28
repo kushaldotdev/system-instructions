@@ -4,7 +4,9 @@ AI workflow rules for coding agents. Portable across opencode, Claude Code, Anti
 
 ## OpenCode Custom Modes
 
-Portable custom agent configurations for OpenCode in the `opencode/` directory. Supports five specialized modes with per-mode model selection and permissions.
+Portable custom agent configurations for OpenCode in the `opencode/` directory.
+Includes six specialized agents, automatic risk-based review routing, and a
+shared exhaustive-review skill.
 
 ### Configured Modes
 
@@ -13,54 +15,103 @@ Portable custom agent configurations for OpenCode in the `opencode/` directory. 
 | **`plan`** | Read-only planning | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
 | **`test`** | Test authoring and validation | `9router-opencode-go/ocg/glm-5.2` | Edit + bash allow |
 | **`build`** | Code implementation | `9router-opencode-go/ocg/glm-5.2` | Edit allow, bash allow |
-| **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
+| **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
+| **`audit`** | Direct or delegated deep-review specialist | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
 | **`general`** | High-permission exploratory | `9router-antigravity/ag/gemini-3.5-flash-low` | Edit + bash allow |
 
 ### Installation
 
-Separate scripts for separate locations. Choose global (all projects) or per-project install.
+Run the same dependency-free Python 3.10+ installer in the environment where
+OpenCode runs. It never discovers or modifies another operating environment.
 
 **Linux / WSL:**
 ```bash
 # Interactive (prompts for mode and project)
-bash opencode/install.sh
+python3 opencode/install.py
 
 # Global only
-bash opencode/install.sh --global
+python3 opencode/install.py --global
 
 # Project only
-bash opencode/install.sh --project ~/my-project
+python3 opencode/install.py --project ~/my-project
+
+# Global and current project
+python3 opencode/install.py --both
+
+# Preserve current LSP setting (default), or set it explicitly
+python3 opencode/install.py --global --lsp
+python3 opencode/install.py --global --no-lsp
 ```
 
-**Windows (PowerShell):**
-```powershell
-# Interactive
-.\opencode\install.ps1
-
-# Global only
-.\opencode\install.ps1 -Global
-
-# Project only
-.\opencode\install.ps1 -Project C:\projects\my-project
-```
-
-**Windows (Command Prompt):**
+**Windows:**
 ```bat
-opencode\install.bat
+# Interactive
+py -3 opencode\install.py
+
+# Global only
+py -3 opencode\install.py --global
+
+# Project only
+py -3 opencode\install.py --project C:\projects\my-project
+
+# Global and current project
+py -3 opencode\install.py --both
 ```
+
+Windows requires Python 3.10+ through `py -3` or an equivalent Python command.
+WSL installation must be run from WSL; Windows installation must be run from
+Windows. Each invocation uses that Python process's home directory and path
+semantics.
 
 ### What Gets Installed
 
-| Scope | Target | Agent files | Config |
-|-------|--------|-------------|--------|
-| Global | `~/.config/opencode/` | `instructions.md`, `agents/*.md` | `opencode.jsonc` |
-| Project | `<project>/.opencode/` | `instructions.md`, `agents/*.md` | `opencode.jsonc` |
+| Scope | Target | Installed workflow | Config |
+|-------|--------|--------------------|--------|
+| Global | `~/.config/opencode/` | `instructions.md`, six `agents/*.md`, `skills/exhaustive-review/SKILL.md` | Existing `opencode.json(c)` or new `opencode.jsonc` |
+| Project | `<project>/.opencode/` | `instructions.md`, six `agents/*.md`, `skills/exhaustive-review/SKILL.md` | Existing `opencode.json(c)` or new `opencode.jsonc` |
 
-Project install is skipped if a global config already exists (deep-merged: global config applies to all projects).
+Project installation is never skipped merely because global configuration
+exists. Installer safely merges managed agents and instruction path while
+preserving the semantics of unrelated settings, custom agents, plugins, and
+current LSP configuration. JSONC comments/formatting may be normalized; the
+timestamped pre-change backup retains original bytes. Repeated installation is
+idempotent.
 
-### Cross-Environment (WSL + Windows)
+Installer validates resolved config, skill discovery, and both review agents
+with `opencode debug` when OpenCode is available. Quit and restart OpenCode after
+installation because configuration-time files are not hot-reloaded.
 
-The Linux script detects WSL and also installs to Windows user profiles under `/mnt/c/Users/`. The PowerShell script detects WSL distros and installs to WSL home directories. Run either script to cover both environments.
+One implementation handles JSONC parsing, semantic config merge, backups,
+locking, atomic replacement, managed-file rollback, and runtime discovery on
+both Windows and WSL. No Node package, PowerShell script, shell installer, or
+third-party Python package is required.
+
+### Review Workflow
+
+- Local, one-layer, reversible changes receive one exhaustive review.
+- Cross-layer, distributed, destructive, security, financial, migration,
+  datetime, scheduling, public-contract, or otherwise high-risk changes receive
+  independent specialist audits followed by synthesis.
+- All specialist reports finish before synthesis. Synthesis freezes one
+  canonical finding set before fixes begin.
+- Explicit overrides: `single review`, `deep review`, `multiple reviewers`, or
+  `skip review`. An explicit skip ends as `Review skipped — not workflow
+  complete`, not a pass.
+- Shared methodology lives in
+  `opencode/skills/exhaustive-review/SKILL.md`.
+
+Review findings are written under each project's
+`.agents/review/YYYY-MM-DD-HH-MM-SS-<slug>.md`, using environment-local
+24-hour time. Reports are human-readable Markdown with
+an executive summary, plainly explained findings, remediation guidance,
+coverage, verification, residual risks, and verdict. Canonical pipe-delimited
+finding lines remain embedded for stable search and tooling.
+Review/audit agents use native clock commands to obtain this timestamp and may
+run read-only verification commands. Existing same-second paths are never
+overwritten; a numeric suffix is added instead.
+
+Compact manual evaluation scenarios live in
+`opencode/evaluation/exhaustive-review-scenarios.md`.
 
 ## Quick Start (Other Agents)
 
@@ -145,7 +196,7 @@ When a session context grows large (asks at ~50 turns, then reminds every 20 tur
 
 **Flow:**
 1. AI detects trigger condition and asks: "Context large -- write checkpoint and resume new session? [y/N]"
-2. User approves -- AI writes checkpoint to `.agents/state/YYYY-MM-DD-<slug>.md` using the template
+2. User approves -- AI writes checkpoint to `.agents/state/YYYY-MM-DD-HH-MM-SS-<slug>.md` using the template
 3. User starts a fresh session and runs: `Resume from .agents/state/<file>`
 4. New AI reads checkpoint + loads RULES.md fresh -- continues exactly where left off
 
@@ -158,7 +209,8 @@ The installer prompts whether to enable **LSP (Language Server Protocol)** for o
 | Setting | Effect |
 |---------|--------|
 | LSP enabled | `"lsp": true` added to `opencode.jsonc`. OpenCode auto-detects and starts language servers (TypeScript, Python, HTML, CSS, Go, Rust, etc.) when matching files are opened. Diagnostics are fed back to the agent. |
-| LSP disabled (default) | No LSP config. Agent uses grep/read for code navigation. Saves ~small token overhead. |
+| Preserve (default) | Existing `lsp` value is left unchanged; a new config receives no `lsp` key. |
+| LSP disabled | `"lsp": false` is written explicitly. Agent uses other configured navigation tools. |
 
 **Token impact**: LSP adds diagnostic messages to context when reading files. Near-zero for clean codebases. Tens to low hundreds of tokens for error-heavy files.
 

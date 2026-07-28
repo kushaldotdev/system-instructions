@@ -1,2 +1,13 @@
 # AGENTS.md
 .agents/state/
+.agents/plan/
+.agents/review/
+
+# Python test and bytecode caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OpenCode installer backups
+**/opencode.json.bak-*
+**/opencode.jsonc.bak-*

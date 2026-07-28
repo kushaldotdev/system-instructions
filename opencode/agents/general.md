@@ -22,3 +22,7 @@ permission:
 - Migrations: state rollback and backfill cleanup.
 - Prefer strict comparison, parameterized SQL, no mutable Python defaults, no empty JavaScript catches, stable React keys, and accessible HTML.
 - After changes: run tests, check for lint/type errors, self-review the diff.
+- Use General directly only for small, local, low-risk work. Route high-risk
+  cross-layer, distributed-state, destructive, security, financial, migration,
+  scheduling, or public-contract changes through Plan -> Test -> Build ->
+  Review. Full permissions never justify bypassing deep review.
