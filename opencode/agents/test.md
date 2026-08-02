@@ -1,7 +1,7 @@
 ---
 description: Custom Test Mode Agent
 mode: all
-model: 9router-opencode-go/ocg/glm-5.2
+model: 9router-chatgpt/cx/gpt-5.6-sol
 permission:
   edit: allow
   bash: allow

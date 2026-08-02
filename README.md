@@ -13,8 +13,8 @@ shared exhaustive-review skill.
 | Mode | Purpose | Model | Permissions |
 |------|---------|-------|-------------|
 | **`plan`** | Read-only planning | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
-| **`test`** | Test authoring and validation | `9router-opencode-go/ocg/glm-5.2` | Edit + bash allow |
-| **`build`** | Code implementation | `9router-opencode-go/ocg/glm-5.2` | Edit allow, bash allow |
+| **`test`** | Test authoring and validation | `9router-chatgpt/cx/gpt-5.6-sol` | Edit + bash allow |
+| **`build`** | Code implementation | `9router-chatgpt/cx/gpt-5.6-sol` | Edit allow, bash allow |
 | **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
 | **`audit`** | Direct or delegated deep-review specialist | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
 | **`general`** | High-permission exploratory | `9router-antigravity/ag/gemini-3.5-flash-low` | Edit + bash allow |
