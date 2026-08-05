@@ -749,91 +749,6 @@ function cleanSchema(obj: any): any {
 	return obj;
 }
 
-// Does this object (or anything nested) carry a TypeBox meta key?
-function schemaHasTypeboxMeta(obj: any): boolean {
-	if (!obj || typeof obj !== "object") return false;
-	if (Array.isArray(obj)) return obj.some(schemaHasTypeboxMeta);
-	for (const key of TYPEBOX_META_KEYS) {
-		if (key in obj) return true;
-	}
-	return Object.values(obj).some(schemaHasTypeboxMeta);
-}
-
-/**
- * Gemini / Antigravity reject tool schemas that carry enumerable TypeBox
- * metadata keys (~optional, ~kind, ~readonly) with
- * HTTP 400: Unknown name "~optional" ... Cannot find field.
- * This deep-strips those keys from every tool schema embedded in the provider
- * payload before it hits the wire. Handles:
- *   - Gemini native: config.tools[].functionDeclarations[].parameters / parametersJsonSchema
- *   - 9Router / openai-completions: tools[].function.parameters
- * Returns a copy with strips applied, or the original payload if nothing needed
- * stripping (so the wire object is untouched when clean).
- */
-function sanitizePayloadTools(payload: any): any {
-	if (!payload || typeof payload !== "object") return payload;
-
-	const sanitizeSchema = (schema: any): any => {
-		if (!schemaHasTypeboxMeta(schema)) return schema;
-		return cleanSchema(structuredClone(schema));
-	};
-
-	let changed = false;
-	const clone: any = Array.isArray(payload)
-		? payload.map((x: any) => x)
-		: { ...payload };
-
-	// Gemini native: params.config.tools[].functionDeclarations[].parameters*
-	const config = clone.config;
-	if (config && typeof config === "object") {
-		const gTools = config.tools;
-		if (Array.isArray(gTools)) {
-			for (const tool of gTools) {
-				if (!tool || typeof tool !== "object") continue;
-				const fns = tool.functionDeclarations;
-				if (!Array.isArray(fns)) continue;
-				for (const fn of fns) {
-					if (!fn || typeof fn !== "object") continue;
-					for (const key of ["parameters", "parametersJsonSchema"]) {
-						const schema = fn[key];
-						if (schema && schemaHasTypeboxMeta(schema)) {
-							fn[key] = sanitizeSchema(schema);
-							changed = true;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// 9Router / openai-completions: params.tools[].function.parameters
-	// Anthropic: params.tools[].input_schema
-	const pTools = clone.tools;
-	if (Array.isArray(pTools)) {
-		for (const tool of pTools) {
-			if (!tool || typeof tool !== "object") continue;
-			const fn = tool.function;
-			if (fn && typeof fn === "object" && fn.parameters && schemaHasTypeboxMeta(fn.parameters)) {
-				fn.parameters = sanitizeSchema(fn.parameters);
-				changed = true;
-			}
-			if (tool.input_schema && schemaHasTypeboxMeta(tool.input_schema)) {
-				tool.input_schema = sanitizeSchema(tool.input_schema);
-				changed = true;
-			}
-		}
-	}
-
-	return changed ? clone : payload;
-}
-
-// Gemini-family model ids: native gemini-*, 9Router gemini/gemini-* and
-// ag/gemini-*, antigravity. Only these need the sanitizer — the error is
-// Gemini/Antigravity-specific. Everything else passes through untouched.
-function isGeminiModel(modelId: any): boolean {
-	return typeof modelId === "string" && /(^|[/_-])gemini[/_-]/i.test(modelId);
-}
-
 function sanitizeAllTools(pi: any) {
 	try {
 		const tools = typeof pi.getAllTools === "function" ? pi.getAllTools() : [];
@@ -931,26 +846,12 @@ async function sync9RouterModels(): Promise<{ ok: boolean; message: string; coun
 }
 
 export default function (pi: any) {
-	// -----------------------------------------------------------------------
-	// Gemini-only automatic sanitizer. Gemini / Antigravity reject tool schemas
-	// that carry enumerable TypeBox metadata keys (~optional, ~kind, ~readonly)
-	// with HTTP 400: Unknown name "~optional" ... Cannot find field.
-	// This hook fires right before EVERY provider request, but only acts when
-	// the payload model is a Gemini-family id (gemini-*, gemini/gemini-*,
-	// ag/gemini-*). Non-Gemini providers pass through untouched. No manual step
-	// needed; survives MCP tool re-registration.
-	// -----------------------------------------------------------------------
-	pi.on("before_provider_request", (event: any) => {
-		const payload = event?.payload;
-		if (!payload || typeof payload !== "object") return undefined;
-		if (!isGeminiModel(payload.model)) return undefined;
-		const cleaned = sanitizePayloadTools(payload);
-		return cleaned === payload ? undefined : cleaned;
-	});
-
-	// On-demand: /9router-sync syncs the 9Router model catalog and sanitizes
-	// registered tool schemas in place. Run it after Pi starts (or after
-	// /reload), or any time your 9Router model catalog changes.
+	// On-demand only: NO hooks run at Pi launch. Nothing happens until you
+	// invoke /9router-sync. That command syncs the 9Router model catalog AND
+	// sanitizes registered tool schemas in place (removing enumerable TypeBox
+	// metadata keys like ~optional that break Gemini/Antigravity). Run it after
+	// Pi starts (or after /reload), or any time you hit an
+	// "HTTP 400: Unknown name ~optional" error mid-session.
 	pi.registerCommand("9router-sync", {
 		description:
 			"Sync 9Router models from NINE_ROUTER_BASE_URL into models.json and sanitize tool schemas",
