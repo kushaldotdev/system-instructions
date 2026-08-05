@@ -1,6 +1,6 @@
 # Pi Agent Harness Environment & Setup Guide
 
-Automated provisioning, on-demand model sync, and extension catalog for Pi Agent.
+Automated provisioning, automatic tool-schema sanitization, on-demand model sync, and extension catalog for Pi Agent.
 Works on **Windows, Linux, and WSL**.
 
 ---
@@ -178,29 +178,45 @@ AGENT_BROWSER_ENCRYPTION_KEY="<64-hex chars, generated>"
 
 ---
 
-## 🚦 On-demand 9Router sync (`/9router-sync`)
+## 🚦 Gemini tool-schema sanitizer + 9Router sync (`/9router-sync`)
 
-The 9Router model registry is **no longer synced automatically**. Nothing runs at Pi launch.
+### Automatic Gemini sanitizer (no manual step)
 
-To sync the model list into `~/.pi/agent/models.json` **and** sanitize tool schemas, run the
-slash command inside Pi:
+The extension registers a `before_provider_request` hook that fires right before EVERY
+provider request but **only acts on Gemini-family models** (`gemini-*`, `gemini/gemini-*`,
+`ag/gemini-*` — native Gemini, 9Router, and Antigravity). For those models it deep-strips
+internal TypeBox metadata keys (`~optional`, `~kind`, `~readonly`) from tool schemas
+embedded in the payload, fixing `HTTP 400: Unknown name "~optional"` errors. Non-Gemini
+providers (deepseek, etc.) pass through untouched. This matters for tools whose schemas are
+built with `Type.Optional(<raw JSON>)`, e.g. `mcpScript.timeoutMs`, `mcp.limit`, `mcp.offset`
+in `pi-mcp-adapter` — TypeBox marks those with an *enumerable* `~optional` key that survives
+JSON serialization.
+
+> Why `gemini/gemini-3.6-flash` fails but `ag/gemini-3.6-flash-high` seemed to work:
+> both route through the same 9Router proxy to the same strict Gemini/Antigravity backend,
+> and both reject `~optional` identically. The difference was whether `~optional` was present
+> in the tool schemas at request time (e.g. after MCP tools were registered). The automatic
+> sanitizer removes the key for every Gemini request regardless.
+
+### Manual model catalog sync (`/9router-sync`)
+
+Run the slash command to sync the 9Router model list into `~/.pi/agent/models.json`:
 
 ```
 /9router-sync
 ```
 
-What it does:
-
 - Fetches `GET {NINE_ROUTER_BASE_URL}/models` with the `NINE_ROUTER` key from `~/.pi/.env`.
 - Writes the `9router` provider + models into `~/.pi/agent/models.json`
   (`api: openai-completions`, per-model `reasoning` / `input` / `contextWindow` / `maxTokens`).
-- Strips internal TypeBox metadata keys (`~optional`, `~kind`, `~readonly`) from tool schemas
-  (prevents `HTTP 400: Unknown name "~optional"` when calling Gemini / Antigravity endpoints).
+- Also strips `~optional`/`~kind`/`~readonly` from registered tool schemas in place (belt and
+  suspenders on top of the automatic per-request strip).
 - Reports how many models were synced and how many tool schemas were sanitized.
 
 > [!NOTE]
-> Run it after Pi starts (or after `/reload`), or any time your 9Router model catalog changes.
-> If you ever hit `~optional` schema errors mid-session, just run `/9router-sync` again.
+> Run `/9router-sync` after Pi starts (or after `/reload`), or any time your 9Router model
+> catalog changes. You do **not** need it to fix `~optional` errors — the automatic Gemini
+> sanitizer handles those on every request.
 
 ---
 
@@ -219,6 +235,8 @@ What it does:
 | **`@juicesharp/rpiv-todo`** | Interactive persistent session task list and todo tracker. |
 | **`pi-agent-browser-native`** | Native headless browser automation and web page interaction capability. |
 | **`pi-rtk-optimizer`** | RTK command rewriting + tool output compaction (needs the `rtk` binary — auto-installed by setup). |
+| **`pi-sidebar-tui`** | Sidebar TUI panel for Pi (session/context overview). |
+| **`opencode-pi`** | OpenCode provider integration for Pi. |
 
 ### External binaries managed by setup
 
@@ -235,10 +253,13 @@ What it does:
 
 ### `9router-sync.ts` (`~/.pi/agent/extensions/9router-sync.ts`)
 
-- **On-demand model sync**: no hooks — runs only when you invoke `/9router-sync`.
-- **TypeBox Schema Sanitizer**: strips internal TypeBox metadata keys (`~optional`, `~kind`,
-  `~readonly`) from tool parameter schemas on demand, preventing
-  `HTTP 400: Unknown name "~optional"` errors.
+- **Automatic Gemini sanitizer**: hooks `before_provider_request` and strips internal TypeBox
+  metadata keys (`~optional`, `~kind`, `~readonly`) from tool schemas **only for
+  Gemini-family models** (`gemini-*`, `gemini/gemini-*`, `ag/gemini-*` — native Gemini,
+  9Router, Antigravity), preventing `HTTP 400: Unknown name "~optional"` errors. Non-Gemini
+  providers pass through untouched.
+- **Model sync**: `/9router-sync` slash command syncs the 9Router model catalog into
+  `~/.pi/agent/models.json` and sanitizes registered tool schemas in place.
 - **Reasoning Token Support**: configures provider compatibility options allowing live
   reasoning token streaming (`reasoning_content`).
 
@@ -261,4 +282,4 @@ What it does:
 | [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider API keys. |
 | [`~/.pi/agent/settings.json`](file:///home/kushal/.pi/agent/settings.json) | User preferences, theme, and package manifest. |
 | [`~/.pi/agent/models.json`](file:///home/kushal/.pi/agent/models.json) | Provider registry for 9Router models (written by `/9router-sync`). |
-| [`~/.pi/agent/extensions/9router-sync.ts`](file:///home/kushal/.pi/agent/extensions/9router-sync.ts) | On-demand 9Router sync + schema sanitizer command extension. |
+| [`~/.pi/agent/extensions/9router-sync.ts`](file:///home/kushal/.pi/agent/extensions/9router-sync.ts) | Automatic tool-schema sanitizer + on-demand 9Router model sync extension. |

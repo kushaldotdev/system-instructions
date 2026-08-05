@@ -22,8 +22,9 @@
 //      Provided values come from `--env KEY=value` args or the shell environment.
 //   3. Configures ~/.pi/web-search.json and ~/.pi/agent/auth.json (preserves tokens).
 //   4. Merges ~/.pi/agent/settings.json packages WITHOUT duplicating entries, and
-//      replaces the old always-on `9router-discovery.ts` hook with the on-demand
-//      `9router-sync.ts` command extension (migration is automatic).
+//      replaces the old always-on `9router-discovery.ts` hook with the
+//      `9router-sync.ts` extension (automatic schema sanitizer + on-demand
+//      model sync; migration is automatic).
 //   5. Installs the `rtk` Rust binary automatically if missing (official installer
 //      on POSIX, GitHub release download on Windows) and ensures ~/.local/bin is
 //      on PATH for future shells.
@@ -587,6 +588,8 @@ const requiredPackages = [
 	"npm:@juicesharp/rpiv-todo",
 	"npm:pi-agent-browser-native",
 	"npm:pi-rtk-optimizer",
+	"npm:pi-sidebar-tui",
+	"npm:opencode-pi",
 	"extensions/9router-sync.ts",
 ];
 
@@ -621,7 +624,7 @@ if (!Array.isArray(settingsConfig.packages)) {
 	settingsConfig.packages = [];
 }
 
-// -- Migrate: drop the old always-on hook entry, add the on-demand command one --
+// -- Migrate: drop the old always-on hook entry, add the sanitizer+sync one --
 settingsConfig.packages = settingsConfig.packages.filter((p) => {
 	const key = typeof p === "string" ? p : p?.source;
 	if (key === OLD_HOOK_SOURCE) {
@@ -663,14 +666,33 @@ if (fs.existsSync(OLD_HOOK_FILE)) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. On-demand 9Router Sync extension (~/.pi/agent/extensions/9router-sync.ts)
-//    Registers a `/9router-sync` slash command. NO session_start hooks.
+// 6. 9Router Sync + Tool-Schema Sanitizer extension
+//    (~/.pi/agent/extensions/9router-sync.ts)
+//    ON-DEMAND ONLY — nothing runs at Pi launch (no session_start /
+//    before_agent_start / before_provider_request hooks).
+//    The /9router-sync slash command:
+//      - syncs the 9Router model catalog into ~/.pi/agent/models.json
+//      - sanitizes registered tool schemas in place (removes enumerable
+//        TypeBox metadata keys ~optional/~kind/~readonly, fixing Gemini/
+//        Antigravity `HTTP 400: Unknown name "~optional"`).
 // ---------------------------------------------------------------------------
 const SYNC_FILE = path.join(EXT_DIR, "9router-sync.ts");
-const syncCode = `// On-demand 9Router model sync + tool schema sanitizer.
-// Run the command manually:  /9router-sync
-// This extension does NOT hook session_start / before_agent_start:
-// nothing runs at Pi launch. Everything happens only when you invoke the command.
+const syncCode = `// On-demand tool-schema sanitizer + 9Router model sync.
+// ============================================================================
+// Root cause this fixes:
+//   Some tools (e.g. pi-mcp-adapter's mcpScript.timeoutMs, mcp.limit, mcp.offset)
+//   build parameter properties with Type.Optional(<raw JSON>). TypeBox marks
+//   those with an ENUMERABLE ~optional key, which survives JSON.stringify and
+//   reaches the provider payload. Google Gemini / Antigravity rejects it with:
+//     HTTP 400: Unknown name "~optional" ... Cannot find field.
+//
+// Fix: run /9router-sync (on demand) to sanitize registered tool schemas in
+// place — deleting enumerable TypeBox metadata keys (~optional, ~kind, ~readonly)
+// from every tool's parameters object — and to sync the 9Router model catalog.
+// NOTHING runs at Pi launch; no session_start / before_agent_start /
+// before_provider_request hooks. Everything happens only when you invoke the
+// command. Run it after Pi starts (or after /reload), or any time you hit an
+// "HTTP 400: Unknown name ~optional" error mid-session.
 import { writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -704,21 +726,112 @@ function getBaseUrl(): string {
 	return url && url !== DEMO_BASE_URL && url.length > 0 ? url : "";
 }
 
+// ---------------------------------------------------------------------------
+// TypeBox metadata keys that must never reach a provider payload.
+// ---------------------------------------------------------------------------
+const TYPEBOX_META_KEYS = new Set(["~optional", "~kind", "~readonly"]);
+
 function cleanSchema(obj: any): any {
 	if (!obj || typeof obj !== "object") return obj;
 	if (Array.isArray(obj)) {
-		obj.forEach(cleanSchema);
+		for (const item of obj) cleanSchema(item);
 		return obj;
 	}
-	delete obj["~optional"];
-	delete obj["~kind"];
-	delete obj["~readonly"];
+	for (const key of TYPEBOX_META_KEYS) {
+		delete obj[key];
+	}
 	for (const key of Object.keys(obj)) {
-		if (obj[key] && typeof obj[key] === "object") {
-			cleanSchema(obj[key]);
+		const value = obj[key];
+		if (value && typeof value === "object") {
+			cleanSchema(value);
 		}
 	}
 	return obj;
+}
+
+// Does this object (or anything nested) carry a TypeBox meta key?
+function schemaHasTypeboxMeta(obj: any): boolean {
+	if (!obj || typeof obj !== "object") return false;
+	if (Array.isArray(obj)) return obj.some(schemaHasTypeboxMeta);
+	for (const key of TYPEBOX_META_KEYS) {
+		if (key in obj) return true;
+	}
+	return Object.values(obj).some(schemaHasTypeboxMeta);
+}
+
+/**
+ * Gemini / Antigravity reject tool schemas that carry enumerable TypeBox
+ * metadata keys (~optional, ~kind, ~readonly) with
+ * HTTP 400: Unknown name "~optional" ... Cannot find field.
+ * This deep-strips those keys from every tool schema embedded in the provider
+ * payload before it hits the wire. Handles:
+ *   - Gemini native: config.tools[].functionDeclarations[].parameters / parametersJsonSchema
+ *   - 9Router / openai-completions: tools[].function.parameters
+ * Returns a copy with strips applied, or the original payload if nothing needed
+ * stripping (so the wire object is untouched when clean).
+ */
+function sanitizePayloadTools(payload: any): any {
+	if (!payload || typeof payload !== "object") return payload;
+
+	const sanitizeSchema = (schema: any): any => {
+		if (!schemaHasTypeboxMeta(schema)) return schema;
+		return cleanSchema(structuredClone(schema));
+	};
+
+	let changed = false;
+	const clone: any = Array.isArray(payload)
+		? payload.map((x: any) => x)
+		: { ...payload };
+
+	// Gemini native: params.config.tools[].functionDeclarations[].parameters*
+	const config = clone.config;
+	if (config && typeof config === "object") {
+		const gTools = config.tools;
+		if (Array.isArray(gTools)) {
+			for (const tool of gTools) {
+				if (!tool || typeof tool !== "object") continue;
+				const fns = tool.functionDeclarations;
+				if (!Array.isArray(fns)) continue;
+				for (const fn of fns) {
+					if (!fn || typeof fn !== "object") continue;
+					for (const key of ["parameters", "parametersJsonSchema"]) {
+						const schema = fn[key];
+						if (schema && schemaHasTypeboxMeta(schema)) {
+							fn[key] = sanitizeSchema(schema);
+							changed = true;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 9Router / openai-completions: params.tools[].function.parameters
+	// Anthropic: params.tools[].input_schema
+	const pTools = clone.tools;
+	if (Array.isArray(pTools)) {
+		for (const tool of pTools) {
+			if (!tool || typeof tool !== "object") continue;
+			const fn = tool.function;
+			if (fn && typeof fn === "object" && fn.parameters && schemaHasTypeboxMeta(fn.parameters)) {
+				fn.parameters = sanitizeSchema(fn.parameters);
+				changed = true;
+			}
+			if (tool.input_schema && schemaHasTypeboxMeta(tool.input_schema)) {
+				tool.input_schema = sanitizeSchema(tool.input_schema);
+				changed = true;
+			}
+		}
+	}
+
+	return changed ? clone : payload;
+}
+
+// Gemini-family model ids: native gemini-*, 9Router gemini/gemini-* and
+// ag/gemini-*, antigravity. Only these need the sanitizer — the error is
+// Gemini/Antigravity-specific. Everything else passes through untouched.
+function isGeminiModel(modelId: any): boolean {
+	return typeof modelId === "string" && /(^|[/_-])gemini[/_-]/i.test(modelId);
 }
 
 function sanitizeAllTools(pi: any) {
@@ -818,6 +931,26 @@ async function sync9RouterModels(): Promise<{ ok: boolean; message: string; coun
 }
 
 export default function (pi: any) {
+	// -----------------------------------------------------------------------
+	// Gemini-only automatic sanitizer. Gemini / Antigravity reject tool schemas
+	// that carry enumerable TypeBox metadata keys (~optional, ~kind, ~readonly)
+	// with HTTP 400: Unknown name "~optional" ... Cannot find field.
+	// This hook fires right before EVERY provider request, but only acts when
+	// the payload model is a Gemini-family id (gemini-*, gemini/gemini-*,
+	// ag/gemini-*). Non-Gemini providers pass through untouched. No manual step
+	// needed; survives MCP tool re-registration.
+	// -----------------------------------------------------------------------
+	pi.on("before_provider_request", (event: any) => {
+		const payload = event?.payload;
+		if (!payload || typeof payload !== "object") return undefined;
+		if (!isGeminiModel(payload.model)) return undefined;
+		const cleaned = sanitizePayloadTools(payload);
+		return cleaned === payload ? undefined : cleaned;
+	});
+
+	// On-demand: /9router-sync syncs the 9Router model catalog and sanitizes
+	// registered tool schemas in place. Run it after Pi starts (or after
+	// /reload), or any time your 9Router model catalog changes.
 	pi.registerCommand("9router-sync", {
 		description:
 			"Sync 9Router models from NINE_ROUTER_BASE_URL into models.json and sanitize tool schemas",
@@ -1134,6 +1267,8 @@ const installPkgs = [
 	"npm:@juicesharp/rpiv-todo",
 	"npm:pi-agent-browser-native",
 	"npm:pi-rtk-optimizer",
+	"npm:pi-sidebar-tui",
+	"npm:opencode-pi",
 ];
 
 console.log("-> Checking package installation...");
@@ -1173,6 +1308,9 @@ console.log("  Next steps:");
 console.log("    1. Restart Pi (or use /reload).");
 console.log("    2. The 9Router model list is NOT synced automatically.");
 console.log("       Run the slash command:  /9router-sync");
+console.log(
+	"       (Gemini tool-schema sanitizer runs automatically — no step needed.)",
+);
 console.log("    3. agent_browser tool: ask for a browser action, e.g.");
 console.log('       "Use the agent_browser tool to open https://example.com".');
 console.log("=============================================");
