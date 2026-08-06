@@ -249,7 +249,6 @@ Run the slash command to sync the 9Router model list into `~/.pi/agent/models.js
 | **`@juicesharp/rpiv-todo`** | Interactive persistent session task list and todo tracker. |
 | **`pi-agent-browser-native`** | Native headless browser automation and web page interaction capability. |
 | **`pi-rtk-optimizer`** | RTK command rewriting + tool output compaction (needs the `rtk` binary — auto-installed by setup). |
-| **`pi-sidebar-tui`** | Sidebar TUI panel for Pi (session/context overview). |
 | **`opencode-pi`** | OpenCode provider integration for Pi. |
 
 ### External binaries managed by setup

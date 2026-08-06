@@ -588,7 +588,6 @@ const requiredPackages = [
 	"npm:@juicesharp/rpiv-todo",
 	"npm:pi-agent-browser-native",
 	"npm:pi-rtk-optimizer",
-	"npm:pi-sidebar-tui",
 	"npm:opencode-pi",
 	"extensions/9router-sync.ts",
 ];
@@ -1172,7 +1171,6 @@ const installPkgs = [
 	"npm:@juicesharp/rpiv-todo",
 	"npm:pi-agent-browser-native",
 	"npm:pi-rtk-optimizer",
-	"npm:pi-sidebar-tui",
 	"npm:opencode-pi",
 ];
 
