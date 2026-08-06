@@ -23,8 +23,8 @@
 //   3. Configures ~/.pi/web-search.json and ~/.pi/agent/auth.json (preserves tokens).
 //   4. Merges ~/.pi/agent/settings.json packages WITHOUT duplicating entries, and
 //      replaces the old always-on `9router-discovery.ts` hook with the
-//      `9router-sync.ts` extension (automatic schema sanitizer + on-demand
-//      model sync; migration is automatic).
+//      `9router-sync.ts` extension (on-demand model sync + tool-schema
+//      sanitizer via /9router-sync; no launch-time hooks).
 //   5. Installs the `rtk` Rust binary automatically if missing (official installer
 //      on POSIX, GitHub release download on Windows) and ensures ~/.local/bin is
 //      on PATH for future shells.
@@ -831,7 +831,11 @@ async function sync9RouterModels(): Promise<{ ok: boolean; message: string; coun
 			name: "9Router Proxy",
 			baseUrl: baseUrl,
 			api: "openai-completions",
-			apiKey: '!node -e "const fs=require(\\'fs\\'),p=require(\\'path\\'),os=require(\\'os\\');try{const c=fs.readFileSync(p.join(os.homedir(),\\'.pi\\',\\'.env\\'),\\'utf8\\'),m=c.match(/NINE_ROUTER=(.+)/);if(m)console.log(m[1].trim().replace(/^[\\\\\\'\\\\\\"]|[\\\\\\'\\\\\\"]$/g,\\'\\'));}catch{}"',
+			// Raw key (not a shell command): resolves identically on Windows and
+			// Linux. The key is read from NINE_ROUTER (.env / env var) at sync
+			// time by getApiKey() above. auth.json carries the same key with
+			// higher precedence; this models.json value is the fallback layer.
+			apiKey: apiKey,
 			compat: {
 				supportsDeveloperRole: false,
 			},
@@ -1210,7 +1214,10 @@ console.log("    1. Restart Pi (or use /reload).");
 console.log("    2. The 9Router model list is NOT synced automatically.");
 console.log("       Run the slash command:  /9router-sync");
 console.log(
-	"       (Gemini tool-schema sanitizer runs automatically — no step needed.)",
+	"       (This also sanitizes registered tool schemas on demand — run it",
+);
+console.log(
+	"       after /reload, or again if you hit a 400 on Gemini mid-session.)",
 );
 console.log("    3. agent_browser tool: ask for a browser action, e.g.");
 console.log('       "Use the agent_browser tool to open https://example.com".');
