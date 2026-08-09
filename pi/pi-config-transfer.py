@@ -87,7 +87,7 @@ PI_NPM = "@earendil-works/pi-coding-agent"
 # Top-level entries under ~/.pi/agent to sync
 SYNC_AGENT_ITEMS = [
     "extensions", "settings.json", "models.json", "keybindings.json",
-    "AGENTS.md", "prompts", "themes", "skills", "chains", "config",
+    "AGENTS.md", "SYSTEM.md", "APPEND_SYSTEM.md", "prompts", "themes", "skills", "chains", "config",
     "profiles",
 ]
 
