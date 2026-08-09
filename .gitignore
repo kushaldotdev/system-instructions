@@ -12,4 +12,7 @@ __pycache__/
 **/opencode.json.bak-*
 **/opencode.jsonc.bak-*
 
+# pi-config-transfer export folders (config snapshots — machine-specific, may contain local state)
+**/pi-setup-export/
+
 .pi-subagents/*

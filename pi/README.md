@@ -1,147 +1,83 @@
-# Pi Agent Harness Environment & Setup Guide
+# Pi Agent Environment & Sync Guide
 
-Automated provisioning and extension catalog for Pi Agent.
+Automated provisioning and configuration sync for Pi Agent.
 Works on **Windows, Linux, and WSL**.
 
+Replaces the old `setup-pi-agent.js` provisioner with a single Python tool that
+**exports** your complete Pi setup from your main machine and **provisions** a new
+machine with the exact same extensions, packages, configs, and disabled-states —
+without copying API keys or auth tokens.
+
 ---
 
-## 🚀 Quick Start (New Computer Setup)
+## 🚀 Quick Start
 
-To setup or restore Pi Agent settings, extensions, and configurations on a new machine:
-
-```bash
-node setup-pi-agent.js
-```
-
-### Target selection (`--target`)
-
-Run the script from inside **WSL** to provision either the WSL side (default) or the
-**Windows** side of the same machine:
+### On your main machine — export your setup
 
 ```bash
-node setup-pi-agent.js                     # default: wsl (when running inside WSL)
-node setup-pi-agent.js --target wsl        # explicit: provision the WSL side
-node setup-pi-agent.js --target windows    # provision the Windows side (from WSL)
-node setup-pi-agent.js --target windows --no-install   # config files only
+python3 pi-config-transfer.py export            # -> ./pi-setup-export/ (in cwd)
 ```
 
-- **Default** = `wsl` inside WSL, `windows` on a native Windows host, `native` elsewhere.
-- `--target windows` from WSL resolves the Windows user profile via `%USERPROFILE%`
-  (`/mnt/c/Users/<user>`), writes all configs there (`C:\Users\<user>\.pi`), and runs
-  installs through Windows interop (`cmd.exe`/`powershell.exe` full paths — Windows exes
-  are not on the WSL `PATH`).
-- rtk installs as `rtk.exe` into `%USERPROFILE%\.local\bin` (added to the Windows user
-  PATH); `agent-browser` installs via Windows `npm -g`; Chrome for Testing lands in
-  `%USERPROFILE%\.agent-browser\browsers`.
-- If `pi` itself is missing on the Windows side, the script bootstraps it first
-  (`npm install -g @earendil-works/pi-coding-agent`), then installs the configured packages.
+This creates a small, portable snapshot containing:
+- **Config only** — no `npm/` node_modules tree, no sessions, no auth
+- Your **package list** (14 packages) → reinstalled on the target via `pi install`
+- Your **custom extensions** (web-search-trim, pi-update, subagent, pi-rtk-optimizer, ...)
+- **settings.json** wholesale — disabled-extension filters preserved
+- The **pi-web-access trim patch** (provider trim applied automatically on import)
+- `models.json`, `web-search.json` (keys **stripped**), agent-browser config,
+  AGENTS.md, themes, skills, prompts, chains, profiles
 
-The script will also:
+### On the new machine — provision in one command
 
-- **Auto-install the `rtk` binary** (Rust token killer) if missing — official installer on
-  Linux/macOS/WSL, GitHub release download on Windows — and make sure `~/.local/bin` is on
-  PATH for future shells.
-- **Auto-install `agent-browser`** (CLI via `npm -g`) and run `agent-browser install` to
-  download Chrome for Testing, so the `agent_browser` tool works out of the box. Warns if
-  `ffmpeg` is missing (only needed for screen recording).
-- **Never modifies npm-installed packages** (`pi-agent-browser-native`, `pi-rtk-optimizer`,
-  ...). All customization lives in separate top-level files under
-  `~/.pi/agent/extensions/`, so future package updates cannot overwrite our code.
+```bash
+python3 pi-config-transfer.py import
+```
 
-### Provide API keys / URLs during setup
+That's it. Import looks for `./pi-setup-export/` by default (the same default folder
+that `export` creates), so you only need to pass a folder name if you renamed the
+export. It does everything, in order:
 
-Pass values with `--env KEY=value` (repeatable) or export them in the shell. The merge is smart:
-
-| Existing value in `~/.pi/.env` | What happens |
+| Step | What it does |
 | :--- | :--- |
-| key missing | written (placeholder or provided value) |
-| blank (`""`) | **overwritten** (placeholder or provided value) |
-| demo/default placeholder | **replaced** when a real value is provided |
-| real value | **preserved**, never clobbered — but normalized to quoted form (`KEY="value"`) if it was typed naked |
+| **1. pi itself** | If `pi` not on PATH → `npm install -g @earendil-works/pi-coding-agent` |
+| **2. Config files** | Restores extensions/, settings.json, models.json, web-search.json, config/, AGENTS.md, themes, skills, prompts, chains, profiles (backs up existing files first) |
+| **3. Packages** | `pi install` each package from the exported list (idempotent, keeps disabled-extension filters) |
+| **4. Trim patch** | Applies the pi-web-access provider trim (`openai`, `exa`, `tavily`) |
+| **5. Binaries** | Installs `rtk`, `agent-browser` CLI + Chrome for Testing, warns if `ffmpeg` missing |
+| **6. Final notes** | Auth/keys reminders, `/reload` |
 
-```bash
-node setup-pi-agent.js \
-  --env TAVILY_API_KEY=tvly-your-key \
-  --env EXA_API_KEY=sk-exa-... \
-  --env BRAVE_API_KEY=...
-```
-
-### Managed API keys (tool/extension keys only)
-
-> Model/provider API keys (ANTHROPIC, OPENAI, GEMINI, DEEPSEEK, ...) are **intentionally not**
-> managed here — configure those via `pi /login` or `~/.pi/agent/auth.json`. This script only
-> manages **tool/extension keys**, so it stays orthogonal to your model access.
-
-All keys below are written to `~/.pi/.env` and automatically wired into the configs that use
-them (`web-search.json` readers, agent-browser config). Fill them via
-`--env KEY=value`, export in the shell, or edit `~/.pi/.env` directly and re-run:
-
-| Group | Keys | Used by |
-| :--- | :--- | :--- |
-| Web search | `TAVILY_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`, `PARALLEL_API_KEY`, `TINYFISH_API_KEY`, `SEARCH1API_KEY`, `SEARCHINFINITY_API_KEY`, `QUERIT_API_KEY`, `SERPDIVE_API_KEY`, `KAGI_API_KEY`, `OLLAMA_API_KEY`, `SERPBASE_API_KEY`, `ANYSEARCH_API_KEY`, `BRIGHTDATA_API_KEY` (+ `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`), `FIRECRAWL_API_KEY`, `PERPLEXITY_API_KEY` | `pi-web-access` search providers |
-| agent-browser providers | `BROWSERLESS_API_KEY`, `BROWSERBASE_API_KEY`, `BROWSER_USE_API_KEY`, `KERNEL_API_KEY` | `agent_browser` cloud providers |
-| agent-browser web search | `EXA_API_KEY`, `BRAVE_API_KEY` (shared) | `agent_browser_web_search` companion |
-
-One key is **auto-generated**, not managed as a blank placeholder:
-
-- `AGENT_BROWSER_ENCRYPTION_KEY` — random 64-char hex (AES-256-GCM) generated on first run
-  for agent-browser state encryption; kept stable on re-runs, never clobbered if you set one.
-
-### Config-only mode
-
-Skip binary/package installs and only (re)generate config files:
-
-```bash
-node setup-pi-agent.js --no-install
-```
+> [!NOTE]
+> **API keys & auth are NOT copied by default.** Re-export with `--include-secrets`
+> if you want them, and treat that export like a private key.
 
 ---
 
-## 🔑 Post-Installation Credentials Setup
+## 📋 Commands
 
-After running `node setup-pi-agent.js`, populate your API keys in the generated environment files:
+| Command | Purpose |
+| :--- | :--- |
+| `python3 pi-config-transfer.py export [dest]` | Create export folder (default `./pi-setup-export/`) |
+| `python3 pi-config-transfer.py export --include-secrets` | Also export API keys (models.json apiKey, tavily key) |
+| `python3 pi-config-transfer.py export --dry-run` | Preview what would be exported |
+| `python3 pi-config-transfer.py import [src]` | **Full provisioning** (6 steps above); defaults to `./pi-setup-export/` |
+| `python3 pi-config-transfer.py import [src] --no-install` | Config files only — skip pi/packages/binaries/patch |
+| `python3 pi-config-transfer.py import [src] --dry-run` | Preview what would be applied |
+| `python3 pi-config-transfer.py list [src]` | Show packages + items inside an export; defaults to `./pi-setup-export/` |
+| `python3 pi-config-transfer.py check` | Show environment info (platform, paths, tool availability) |
 
-### 1. `~/.pi/.env`
+---
 
-```env
-# --- Web search providers ---
-TAVILY_API_KEY="tvly-your-key-here"
-BRAVE_API_KEY=""
-EXA_API_KEY=""
-PARALLEL_API_KEY=""
-TINYFISH_API_KEY=""
-SEARCH1API_KEY=""
-SEARCHINFINITY_API_KEY=""
-QUERIT_API_KEY=""
-SERPDIVE_API_KEY=""
-KAGI_API_KEY=""
-OLLAMA_API_KEY=""
-SERPBASE_API_KEY=""
-ANYSEARCH_API_KEY=""
-BRIGHTDATA_API_KEY=""
-BRIGHTDATA_SERP_ZONE=""
-BRIGHTDATA_UNLOCKER_ZONE=""
-FIRECRAWL_API_KEY=""
-PERPLEXITY_API_KEY=""
-# --- agent-browser cloud providers ---
-BROWSERLESS_API_KEY=""
-BROWSERBASE_API_KEY=""
-BROWSER_USE_API_KEY=""
-KERNEL_API_KEY=""
-# --- auto-generated on first run ---
-AGENT_BROWSER_ENCRYPTION_KEY="<64-hex chars, generated>"
-```
+## 🔒 Security Model
 
-### 2. `~/.pi/agent/auth.json`
+| Item | Default behavior |
+| :--- | :--- |
+| `auth.json` (Codex/OpenAI OAuth tokens) | **Never exported** — re-login per machine (`pi auth login`) |
+| `tavilyApiKey` (web-search.json) | **Stripped** → `***REDACTED***` unless `--include-secrets` |
+| `models.json` `apiKey` (custom provider keys) | **Stripped** → `***REDACTED***` unless `--include-secrets` |
+| `npm/`, `bin/`, `git/`, `sessions/`, `missions/` | **Never exported** — packages reinstalled from the list |
+| Export folder (with `--include-secrets`) | Treat like a private key — contains real credentials |
 
-```json
-{
-  "opencode": {
-    "type": "api_key",
-    "key": "your-opencode-key"
-  }
-}
-```
+A best-effort **secret scan** warns if an exported file contains a key-shaped value.
 
 ---
 
@@ -151,34 +87,42 @@ AGENT_BROWSER_ENCRYPTION_KEY="<64-hex chars, generated>"
 
 | Package Name | Purpose / Functionality |
 | :--- | :--- |
-| **`pi-mcp-adapter`** | Integrates Model Context Protocol (MCP) servers and tools into Pi harness. |
-| **`pi-web-access`** | Comprehensive web search, webpage scraping, YouTube transcript/frame analysis, PDF reading, and multi-provider fallback routing (SearXNG, Exa, Brave, Tavily, Gemini). |
-| **`pi-subagents`** | Enables spawning, communicating with, and orchestrating sub-agents concurrently. |
-| **`pi-lens`** | Language Server Protocol (LSP) diagnostics, read-guard file enforcement, and inline code checks. |
-| **`@juicesharp/rpiv-ask-user-question`** | Renders interactive multi-choice question prompts for user decision input. |
-| **`@ff-labs/pi-fff`** | Fast File Finder (FFF) using frecency-based file search and history ranking. |
-| **`@juicesharp/rpiv-todo`** | Interactive persistent session task list and todo tracker. |
-| **`pi-agent-browser-native`** | Native headless browser automation and web page interaction capability. |
-| **`pi-rtk-optimizer`** | RTK command rewriting + tool output compaction (needs the `rtk` binary — auto-installed by setup). |
-| **`opencode-pi`** | OpenCode provider integration for Pi. |
+| **`pi-mcp-adapter`** | Integrates Model Context Protocol (MCP) servers and tools into Pi. |
+| **`pi-web-access`** | Web search, webpage scraping, YouTube transcripts, PDF reading, multi-provider fallback (trimmed to openai/exa/tavily). |
+| **`pi-subagents`** | Spawn, communicate with, and orchestrate sub-agents. |
+| **`pi-lens`** | LSP diagnostics, read-guard file enforcement, inline code checks. |
+| **`@juicesharp/rpiv-ask-user-question`** | Interactive multi-choice question prompts. |
+| **`@ff-labs/pi-fff`** | Fast File Finder (FFF) with frecency ranking. |
+| **`@juicesharp/rpiv-todo`** | Persistent session task list. |
+| **`pi-agent-browser-native`** | Headless browser automation and web interaction. |
+| **`pi-rtk-optimizer`** | RTK command rewriting + tool output compaction (needs the `rtk` binary — auto-installed by import). |
+| **`opencode-pi`** | OpenCode provider integration. |
 
-### External binaries managed by setup
+Plus (from the exported `settings.json`): `cc-safety-net`, `pi-token-speed`,
+`pine-of-glass`, `pi-antigravity-rotator`.
 
-| Binary | Needed by | Auto-installed by setup |
+### External binaries handled by import
+
+| Binary | Needed by | Import behavior |
 | :--- | :--- | :--- |
-| `rtk` (`~/.local/bin/rtk`) | `pi-rtk-optimizer` command rewriting | ✅ official installer / GitHub release |
-| `agent-browser` (npm global) | `pi-agent-browser-native` | ✅ `npm install -g agent-browser` |
-| Chrome for Testing (`~/.agent-browser/browsers/`) | `agent_browser` tool launch | ✅ `agent-browser install` |
-| `ffmpeg` | browser screen recording (`record stop`) | ⚠️ warning only (apt/brew/winget) |
+| `rtk` (`~/.local/bin/rtk`) | `pi-rtk-optimizer` | ✅ Auto-installs if missing (official installer) |
+| `agent-browser` (npm global) | `pi-agent-browser-native` | ✅ `npm install -g agent-browser` if missing |
+| Chrome for Testing (`~/.agent-browser/browsers/`) | `agent_browser` tool launch | ✅ `agent-browser install` (one-time download) |
+| `ffmpeg` | browser screen recording (`record stop`) | ⚠️ Warning only (apt/brew/winget) |
 
 ---
 
 ## 🛠️ Custom Local Extensions
 
-> [!NOTE]
-> **Excluded Machine-Specific Extensions**: `herdr-agent-state.ts` is intentionally excluded
-> from `setup-pi-agent.js` and portable provisioners because it is a local host-specific state
-> extension intended for your primary workstation only.
+| Extension | What it does |
+| :--- | :--- |
+| `web-search-trim` | `/web-search-trim` — trims web_search providers to openai/exa/tavily (re-patches pi-web-access after updates) |
+| `pi-update` | `/update` — updates pi + all extensions with live progress + completion message |
+| `subagent` | Compact tool descriptions, summary inline display, async-by-default |
+| `pi-rtk-optimizer` | RTK output compaction configuration |
+
+These live under `~/.pi/agent/extensions/` and are **exported wholesale** — new
+extensions added later are picked up automatically on the next export (no code change).
 
 ---
 
@@ -186,9 +130,30 @@ AGENT_BROWSER_ENCRYPTION_KEY="<64-hex chars, generated>"
 
 | File Path | Description |
 | :--- | :--- |
-| [`pi/setup-pi-agent.js`](file:///home/kushal/projects/system-instructions/pi/setup-pi-agent.js) | Main idempotent Node.js provisioner script (Windows/Linux/WSL). |
-| [`~/.pi/.env`](file:///home/kushal/.pi/.env) | Isolated environment variables (web-search, agent-browser provider keys — see the managed-keys table above). |
-| [`~/.pi/web-search.json`](file:///home/kushal/.pi/web-search.json) | Configures `web_search` provider routing and fallback resolution; each provider key is a `!node` reader into `~/.pi/.env`, so filling `.env` activates the provider. |
-| [`~/.pi/config/pi-agent-browser-native/config.json`](file:///home/kushal/.pi/config/pi-agent-browser-native/config.json) | agent-browser user config enabling the `agent_browser_web_search` companion (reads EXA/BRAVE keys from `~/.pi/.env`). |
-| [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider API keys. |
-| [`~/.pi/agent/settings.json`](file:///home/kushal/.pi/agent/settings.json) | User preferences, theme, and package manifest. |
+| [`pi/pi-config-transfer.py`](file:///home/kushal/projects/system-instructions/pi/pi-config-transfer.py) | The export/import/provision tool (Python 3, cross-platform). |
+| [`~/.pi/agent/settings.json`](file:///home/kushal/.pi/agent/settings.json) | User preferences, theme, package manifest (incl. disabled-extension filters). |
+| [`~/.pi/agent/extensions/`](file:///home/kushal/.pi/agent/extensions/) | Custom slash-command extensions (web-search-trim, pi-update, subagent, ...). |
+| [`~/.pi/agent/models.json`](file:///home/kushal/.pi/agent/models.json) | Custom provider definitions (apiKey stripped on export). |
+| [`~/.pi/web-search.json`](file:///home/kushal/.pi/web-search.json) | web_search provider routing + fallback config (key stripped on export). |
+| [`~/.pi/config/pi-agent-browser-native/config.json`](file:///home/kushal/.pi/config/pi-agent-browser-native/config.json) | agent-browser user config. |
+| [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider logins (never exported). |
+
+---
+
+## 🔑 After Import (on the new machine)
+
+1. **Re-add keys** if you didn't use `--include-secrets`:
+   - `~/.pi/web-search.json` → `tavilyApiKey`
+   - `~/.pi/agent/models.json` → custom provider `apiKey`
+2. **Log in** for model access: run `pi` → `/auth` (or `pi auth login`).
+3. **`/reload`** inside pi to load the imported extensions.
+
+---
+
+## 🧹 Post-Migration Cleanup
+
+- Export folders (`pi-setup-export/`) are git-ignored — they can contain machine
+  state and are meant to travel by USB/scp, not be committed.
+- `.pi-transfer.bak` backups of overwritten files are kept next to the originals.
+- Backup files that contain secrets (e.g. `web-search.json.pi-transfer.bak`) should
+  be `chmod 600`.
