@@ -4,7 +4,6 @@
 // ----------------------------------------------------------------------------
 // Run:  node setup-pi-agent.js                      (provisions the WSL/Linux side)
 //       node setup-pi-agent.js --target windows     (provisions the Windows side)
-//       node setup-pi-agent.js --env NINE_ROUTER=sk-xxx --env NINE_ROUTER_BASE_URL=https://my-proxy.com/v1
 //
 // Target selection (default: wsl when running inside WSL, windows on a Windows
 // host, native elsewhere):
@@ -21,10 +20,7 @@
 //        - key present = real value -> PRESERVED (never clobbered)
 //      Provided values come from `--env KEY=value` args or the shell environment.
 //   3. Configures ~/.pi/web-search.json and ~/.pi/agent/auth.json (preserves tokens).
-//   4. Merges ~/.pi/agent/settings.json packages WITHOUT duplicating entries, and
-//      replaces the old always-on `9router-discovery.ts` hook with the
-//      `9router-sync.ts` extension (on-demand model sync + tool-schema
-//      sanitizer via /9router-sync; no launch-time hooks).
+//   4. Merges ~/.pi/agent/settings.json packages WITHOUT duplicating entries.
 //   5. Installs the `rtk` Rust binary automatically if missing (official installer
 //      on POSIX, GitHub release download on Windows) and ensures ~/.local/bin is
 //      on PATH for future shells.
@@ -309,7 +305,7 @@ const ENV_FILE = path.join(PI_DIR, ".env");
 
 // placeholder values the script considers "empty / default / demo" and may replace.
 // NOTE: model/provider API keys (ANTHROPIC, OPENAI, GEMINI, ...) are intentionally
-// NOT managed here — this is only for tool/extension keys (web search, 9Router,
+// NOT managed here — this is only for tool/extension keys (web search,
 // agent-browser providers). Configure model keys via `pi /login` or auth.json.
 const ENV_PLACEHOLDERS = {
 	// --- Web search providers (pi-web-access) ---
@@ -331,9 +327,6 @@ const ENV_PLACEHOLDERS = {
 	BRIGHTDATA_UNLOCKER_ZONE: '""',
 	FIRECRAWL_API_KEY: '""',
 	PERPLEXITY_API_KEY: '""',
-	// --- 9Router proxy ---
-	NINE_ROUTER: '""',
-	NINE_ROUTER_BASE_URL: '"https://your-9router-proxy-domain.com/v1"',
 	// --- agent-browser cloud providers ---
 	BROWSERLESS_API_KEY: '""',
 	BROWSERBASE_API_KEY: '""',
@@ -554,7 +547,6 @@ console.log(
 const AUTH_FILE = path.join(AGENT_DIR, "auth.json");
 let authConfig = {
 	opencode: { type: "api_key", key: "" },
-	"9router": { type: "api_key", key: "" },
 };
 
 if (fs.existsSync(AUTH_FILE)) {
@@ -589,11 +581,7 @@ const requiredPackages = [
 	"npm:pi-agent-browser-native",
 	"npm:pi-rtk-optimizer",
 	"npm:opencode-pi",
-	"extensions/9router-sync.ts",
 ];
-
-const OLD_HOOK_SOURCE = "extensions/9router-discovery.ts"; // migrated away
-const OLD_HOOK_FILE = path.join(EXT_DIR, "9router-discovery.ts");
 
 let settingsConfig = {
 	lastChangelogVersion: "0.83.0",
@@ -623,16 +611,6 @@ if (!Array.isArray(settingsConfig.packages)) {
 	settingsConfig.packages = [];
 }
 
-// -- Migrate: drop the old always-on hook entry, add the sanitizer+sync one --
-settingsConfig.packages = settingsConfig.packages.filter((p) => {
-	const key = typeof p === "string" ? p : p?.source;
-	if (key === OLD_HOOK_SOURCE) {
-		console.log(`[~] Removed legacy hook package entry: ${key}`);
-		return false;
-	}
-	return true;
-});
-
 // -- Deduplicate required packages (string or object source identity) --
 for (const reqPkg of requiredPackages) {
 	const reqKey = typeof reqPkg === "string" ? reqPkg : reqPkg.source;
@@ -654,234 +632,8 @@ console.log(
 	`[+] Configured ${SETTINGS_FILE} (packages merged without duplicates)`,
 );
 
-// -- Remove the old hook extension file if it still exists --
-if (fs.existsSync(OLD_HOOK_FILE)) {
-	try {
-		fs.unlinkSync(OLD_HOOK_FILE);
-		console.log(`[~] Deleted legacy hook extension: ${OLD_HOOK_FILE}`);
-	} catch (err) {
-		console.warn(`[!] Could not delete ${OLD_HOOK_FILE}: ${err.message}`);
-	}
-}
-
 // ---------------------------------------------------------------------------
-// 6. 9Router Sync + Tool-Schema Sanitizer extension
-//    (~/.pi/agent/extensions/9router-sync.ts)
-//    ON-DEMAND ONLY — nothing runs at Pi launch (no session_start /
-//    before_agent_start / before_provider_request hooks).
-//    The /9router-sync slash command:
-//      - syncs the 9Router model catalog into ~/.pi/agent/models.json
-//      - sanitizes registered tool schemas in place (removes enumerable
-//        TypeBox metadata keys ~optional/~kind/~readonly, fixing Gemini/
-//        Antigravity `HTTP 400: Unknown name "~optional"`).
-// ---------------------------------------------------------------------------
-const SYNC_FILE = path.join(EXT_DIR, "9router-sync.ts");
-const syncCode = `// On-demand tool-schema sanitizer + 9Router model sync.
-// ============================================================================
-// Root cause this fixes:
-//   Some tools (e.g. pi-mcp-adapter's mcpScript.timeoutMs, mcp.limit, mcp.offset)
-//   build parameter properties with Type.Optional(<raw JSON>). TypeBox marks
-//   those with an ENUMERABLE ~optional key, which survives JSON.stringify and
-//   reaches the provider payload. Google Gemini / Antigravity rejects it with:
-//     HTTP 400: Unknown name "~optional" ... Cannot find field.
-//
-// Fix: run /9router-sync (on demand) to sanitize registered tool schemas in
-// place — deleting enumerable TypeBox metadata keys (~optional, ~kind, ~readonly)
-// from every tool's parameters object — and to sync the 9Router model catalog.
-// NOTHING runs at Pi launch; no session_start / before_agent_start /
-// before_provider_request hooks. Everything happens only when you invoke the
-// command. Run it after Pi starts (or after /reload), or any time you hit an
-// "HTTP 400: Unknown name ~optional" error mid-session.
-import { writeFileSync, existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
-
-const PI_DIR = join(homedir(), ".pi");
-const ENV_FILE = join(PI_DIR, ".env");
-const MODELS_FILE = join(PI_DIR, "agent", "models.json");
-const DEMO_BASE_URL = "https://your-9router-proxy-domain.com/v1";
-
-function getEnvValue(key: string): string | null {
-	if (process.env[key]) return process.env[key]!;
-	if (existsSync(ENV_FILE)) {
-		try {
-			const content = readFileSync(ENV_FILE, "utf-8");
-			const match = content.match(new RegExp(\`^\${key}=\\"?(.+?)\\"?$\`, "m"));
-			if (match) return match[1].trim();
-		} catch {
-			// ignore
-		}
-	}
-	return null;
-}
-
-function getApiKey(): string | null {
-	const key = getEnvValue("NINE_ROUTER");
-	return key && key.length > 0 ? key : null;
-}
-
-function getBaseUrl(): string {
-	const url = getEnvValue("NINE_ROUTER_BASE_URL");
-	return url && url !== DEMO_BASE_URL && url.length > 0 ? url : "";
-}
-
-// ---------------------------------------------------------------------------
-// TypeBox metadata keys that must never reach a provider payload.
-// ---------------------------------------------------------------------------
-const TYPEBOX_META_KEYS = new Set(["~optional", "~kind", "~readonly"]);
-
-function cleanSchema(obj: any): any {
-	if (!obj || typeof obj !== "object") return obj;
-	if (Array.isArray(obj)) {
-		for (const item of obj) cleanSchema(item);
-		return obj;
-	}
-	for (const key of TYPEBOX_META_KEYS) {
-		delete obj[key];
-	}
-	for (const key of Object.keys(obj)) {
-		const value = obj[key];
-		if (value && typeof value === "object") {
-			cleanSchema(value);
-		}
-	}
-	return obj;
-}
-
-function sanitizeAllTools(pi: any) {
-	try {
-		const tools = typeof pi.getAllTools === "function" ? pi.getAllTools() : [];
-		let count = 0;
-		for (const tool of tools) {
-			if (tool?.parameters) {
-				cleanSchema(tool.parameters);
-				count += 1;
-			}
-		}
-		return count;
-	} catch {
-		return 0;
-	}
-}
-
-async function sync9RouterModels(): Promise<{ ok: boolean; message: string; count?: number }> {
-	const apiKey = getApiKey();
-	const baseUrl = getBaseUrl();
-	if (!apiKey) {
-		return { ok: false, message: "NINE_ROUTER API key is not set in ~/.pi/.env" };
-	}
-	if (!baseUrl) {
-		return {
-			ok: false,
-			message:
-				"NINE_ROUTER_BASE_URL is not set (or still the demo placeholder). Set a real URL in ~/.pi/.env",
-		};
-	}
-
-	try {
-		const res = await fetch(\`\${baseUrl}/models\`, {
-			headers: { Authorization: \`Bearer \${apiKey}\` },
-			signal: AbortSignal.timeout(30000),
-		});
-		if (!res.ok) {
-			return { ok: false, message: \`9Router /models returned HTTP \${res.status}\` };
-		}
-
-		const data = (await res.json()) as {
-			data?: Array<{
-				id: string;
-				capabilities?: {
-					reasoning?: boolean;
-					vision?: boolean;
-					contextWindow?: number;
-					maxOutput?: number;
-				};
-			}>;
-		};
-		if (!data?.data || !Array.isArray(data.data) || data.data.length === 0) {
-			return { ok: false, message: "9Router /models returned no models" };
-		}
-
-		const models = data.data.map((m) => {
-			const caps = m.capabilities || {};
-			return {
-				id: m.id,
-				name: \`\${m.id} (9Router)\`,
-				reasoning: Boolean(caps.reasoning),
-				input: caps.vision ? ["text", "image"] : ["text"],
-				contextWindow: caps.contextWindow || 128000,
-				maxTokens: caps.maxOutput || 16384,
-			};
-		});
-
-		let currentConfig: { providers?: Record<string, unknown> } = { providers: {} };
-		if (existsSync(MODELS_FILE)) {
-			try {
-				currentConfig = JSON.parse(readFileSync(MODELS_FILE, "utf-8")) as {
-					providers?: Record<string, unknown>;
-				};
-			} catch {
-				currentConfig = { providers: {} };
-			}
-		}
-		if (!currentConfig.providers) currentConfig.providers = {};
-
-		currentConfig.providers["9router"] = {
-			name: "9Router Proxy",
-			baseUrl: baseUrl,
-			api: "openai-completions",
-			// Raw key (not a shell command): resolves identically on Windows and
-			// Linux. The key is read from NINE_ROUTER (.env / env var) at sync
-			// time by getApiKey() above. auth.json carries the same key with
-			// higher precedence; this models.json value is the fallback layer.
-			apiKey: apiKey,
-			compat: {
-				supportsDeveloperRole: false,
-			},
-			models: models,
-		};
-
-		writeFileSync(MODELS_FILE, JSON.stringify(currentConfig, null, 2), "utf-8");
-		return { ok: true, message: \`Synced \${models.length} 9Router models to \${MODELS_FILE}\`, count: models.length };
-	} catch (err) {
-		return { ok: false, message: \`9Router sync failed: \${err instanceof Error ? err.message : String(err)}\` };
-	}
-}
-
-export default function (pi: any) {
-	// On-demand only: NO hooks run at Pi launch. Nothing happens until you
-	// invoke /9router-sync. That command syncs the 9Router model catalog AND
-	// sanitizes registered tool schemas in place (removing enumerable TypeBox
-	// metadata keys like ~optional that break Gemini/Antigravity). Run it after
-	// Pi starts (or after /reload), or any time you hit an
-	// "HTTP 400: Unknown name ~optional" error mid-session.
-	pi.registerCommand("9router-sync", {
-		description:
-			"Sync 9Router models from NINE_ROUTER_BASE_URL into models.json and sanitize tool schemas",
-		handler: async (args: string, ctx: any) => {
-			const result = await sync9RouterModels();
-			const sanitized = sanitizeAllTools(pi);
-			const message = result.ok
-				? \`\${result.message} | sanitized \${sanitized} tool schemas\`
-				: result.message;
-			try {
-				ctx?.ui?.notify?.(message, result.ok ? "info" : "error");
-			} catch {
-				// no TUI available (headless/rpc) — fall back to stdout
-			}
-			return message;
-		},
-	});
-}
-`;
-
-fs.writeFileSync(SYNC_FILE, syncCode, "utf-8");
-console.log(
-	`[+] Wrote on-demand command extension ${SYNC_FILE} (invoke with /9router-sync)`,
-);
-
-// ---------------------------------------------------------------------------
-// 7. rtk binary — auto-install if missing (Rust token killer)
+// 6. rtk binary — auto-install if missing (Rust token killer)
 // ---------------------------------------------------------------------------
 function ensureRtk() {
 	if (NO_INSTALL) {
@@ -1091,7 +843,7 @@ function ensureLocalBinOnPath() {
 ensureRtk();
 
 // ---------------------------------------------------------------------------
-// 8. agent-browser — CLI + Chrome for Testing + ffmpeg
+// 7. agent-browser — CLI + Chrome for Testing + ffmpeg
 // ---------------------------------------------------------------------------
 function ensureAgentBrowser() {
 	if (NO_INSTALL) {
@@ -1159,7 +911,7 @@ function ensureAgentBrowser() {
 ensureAgentBrowser();
 
 // ---------------------------------------------------------------------------
-// 9. Package Installation (pi install keeps npm packages 100% untouched)
+// 8. Package Installation (pi install keeps npm packages 100% untouched)
 // ---------------------------------------------------------------------------
 const installPkgs = [
 	"npm:pi-mcp-adapter",
@@ -1202,21 +954,13 @@ if (NO_INSTALL) {
 }
 
 // ---------------------------------------------------------------------------
-// 10. Final summary
+// 9. Final summary
 // ---------------------------------------------------------------------------
 console.log("=============================================");
 console.log("   Setup Finished Successfully!              ");
 console.log("---------------------------------------------");
 console.log("  Next steps:");
 console.log("    1. Restart Pi (or use /reload).");
-console.log("    2. The 9Router model list is NOT synced automatically.");
-console.log("       Run the slash command:  /9router-sync");
-console.log(
-	"       (This also sanitizes registered tool schemas on demand — run it",
-);
-console.log(
-	"       after /reload, or again if you hit a 400 on Gemini mid-session.)",
-);
-console.log("    3. agent_browser tool: ask for a browser action, e.g.");
+console.log("    2. agent_browser tool: ask for a browser action, e.g.");
 console.log('       "Use the agent_browser tool to open https://example.com".');
 console.log("=============================================");

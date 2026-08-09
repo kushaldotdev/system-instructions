@@ -10,14 +10,14 @@ shared exhaustive-review skill.
 
 ### Configured Modes
 
-| Mode | Purpose | Model | Permissions |
-|------|---------|-------|-------------|
-| **`plan`** | Read-only planning | `9router-chatgpt/cx/gpt-5.6-sol` | Edit `.md` only, bash allow |
-| **`test`** | Test authoring and validation | `9router-chatgpt/cx/gpt-5.6-sol` | Edit + bash allow |
-| **`build`** | Code implementation | `9router-chatgpt/cx/gpt-5.6-sol` | Edit allow, bash allow |
-| **`review`** | Architectural/security review | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
-| **`audit`** | Direct or delegated deep-review specialist | `9router-chatgpt/cx/gpt-5.6-sol` | Write `.agents/review/**`; shell allowed for read-only verification |
-| **`general`** | High-permission exploratory | `9router-antigravity/ag/gemini-3.5-flash-low` | Edit + bash allow |
+| Mode | Purpose | Permissions |
+| ------ | --------- | ------------- |
+| **`plan`** | Read-only planning | Edit `.md` only, bash allow |
+| **`test`** | Test authoring and validation | Edit + bash allow |
+| **`build`** | Code implementation | Edit allow, bash allow |
+| **`review`** | Architectural/security review | Write `.agents/review/**`; shell allowed for read-only verification |
+| **`audit`** | Direct or delegated deep-review specialist | Write `.agents/review/**`; shell allowed for read-only verification |
+| **`general`** | High-permission exploratory | Edit + bash allow |
 
 ### Installation
 
@@ -27,6 +27,7 @@ installation delegates to the target environment's own Python so home paths,
 locking, config paths, and OpenCode validation remain native.
 
 **Linux / WSL:**
+
 ```bash
 # Interactive (prompts for mode and project)
 python3 opencode/install.py
@@ -51,6 +52,7 @@ python3 opencode/install.py --global --no-lsp
 ```
 
 **Windows:**
+
 ```bat
 # Interactive
 py -3 opencode\install.py
@@ -76,7 +78,7 @@ py -3 opencode\install.py --both
 Environment selection is independent from install scope:
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--environment current` | Install only where `install.py` is running |
 | `--environment windows` | Install in Windows; available from Windows or WSL |
 | `--environment wsl` | Install in WSL; available from WSL or Windows |
@@ -106,7 +108,7 @@ only `current`.
 ### What Gets Installed
 
 | Scope | Target | Installed workflow | Config |
-|-------|--------|--------------------|--------|
+| :--- | :--- | :--- | :--- |
 | Global | `~/.config/opencode/` | `instructions.md`, six `agents/*.md`, `skills/exhaustive-review/SKILL.md` | Existing `opencode.json(c)` or new `opencode.jsonc` |
 | Project | `<project>/.opencode/` | `instructions.md`, six `agents/*.md`, `skills/exhaustive-review/SKILL.md` | Existing `opencode.json(c)` or new `opencode.jsonc` |
 
@@ -208,7 +210,7 @@ The installer copies generated instruction files beside each tool config. Re-run
 Creates instruct bridges at user-configurable locations. Once done, every project on this machine inherits the rules automatically.
 
 | Tool | File created |
-|------|-------------|
+| ------ | ------------- |
 | opencode | `~/.config/opencode/opencode.jsonc` |
 | Claude Code | `~/.claude/CLAUDE.md` |
 | Antigravity | `~/.gemini/GEMINI.md` |
@@ -221,7 +223,7 @@ Creates instruct bridges at user-configurable locations. Once done, every projec
 Creates bridge files inside a project directory. Tools already configured globally are skipped automatically.
 
 | Tool | File | Method |
-|------|------|--------|
+| ------ | ------ | -------- |
 | opencode | `opencode.jsonc` | `instructions` array with absolute paths |
 | Antigravity | `.agent/rules/` prompt + `RULES.md` | Generated prompt plus local rule link/copy |
 | Claude Code | `CLAUDE.md` | Instruct bridge + preserves project content |
@@ -232,7 +234,7 @@ Creates bridge files inside a project directory. Tools already configured global
 ## How It Works
 
 | File | When loaded | Token cost |
-|------|-------------|------------|
+| ------ | ------------- | ------------ |
 | SYSTEM_PROMPT.md | session start | compact always-loaded rules |
 | RULES.md | first Plan or Review action | compact on-demand rules |
 | CHECKPOINT.md.template | on checkpoint trigger | one time per checkpoint |
@@ -244,6 +246,7 @@ Creates bridge files inside a project directory. Tools already configured global
 When a session context grows large (asks at ~50 turns, then reminds every 20 turns thereafter: 70, 90, etc.), after completing changes, or after finding bugs during review -- the AI offers to write a **checkpoint** and resume in a fresh session. This prevents context bloat and memory drift.
 
 **Flow:**
+
 1. AI detects trigger condition and asks: "Context large -- write checkpoint and resume new session? [y/N]"
 2. User approves -- AI writes checkpoint to `.agents/state/YYYY-MM-DD-HH-MM-SS-<slug>.md` using the template
 3. User starts a fresh session and runs: `Resume from .agents/state/<file>`
@@ -256,7 +259,7 @@ Checkpoints include: goal, current state, files changed, open bugs, key decision
 The installer prompts whether to enable **LSP (Language Server Protocol)** for opencode.
 
 | Setting | Effect |
-|---------|--------|
+| --------- | -------- |
 | LSP enabled | `"lsp": true` added to `opencode.jsonc`. OpenCode auto-detects and starts language servers (TypeScript, Python, HTML, CSS, Go, Rust, etc.) when matching files are opened. Diagnostics are fed back to the agent. |
 | Preserve (default) | Existing `lsp` value is left unchanged; a new config receives no `lsp` key. |
 | LSP disabled | `"lsp": false` is written explicitly. Agent uses other configured navigation tools. |

@@ -9,8 +9,20 @@ ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = ROOT.parent
 
 
+def _load_manifest() -> dict:
+    manifest = json.loads(read("agents.json"))
+    if not isinstance(manifest, dict) or not manifest:
+        raise ValueError("agents.json must be a non-empty object")
+    return manifest
+
+
 def read(relative_path: str) -> str:
-    return (ROOT / relative_path).read_text(encoding="utf-8")
+    try:
+        return (ROOT / relative_path).read_text(encoding="utf-8")
+    except OSError as error:
+        raise FileNotFoundError(
+            f"Missing or unreadable test fixture: {relative_path}"
+        ) from error
 
 
 class PromptContractTests(unittest.TestCase):
@@ -78,12 +90,10 @@ class PromptContractTests(unittest.TestCase):
         self.assertIn("high-risk", general)
 
     def test_agent_manifest_includes_audit(self) -> None:
-        manifest = json.loads(read("agents.json"))
+        manifest = _load_manifest()
 
         self.assertEqual(manifest["audit"]["mode"], "all")
-        self.assertEqual(
-            manifest["audit"]["model"], "9router-chatgpt/cx/gpt-5.6-sol"
-        )
+        self.assertNotIn("model", manifest["audit"])
         self.assertEqual(
             manifest["audit"]["permission"]["edit"],
             {
@@ -95,6 +105,12 @@ class PromptContractTests(unittest.TestCase):
         self.assertEqual(manifest["audit"]["permission"]["bash"], "allow")
         self.assertEqual(manifest["review"]["permission"]["bash"], "allow")
         self.assertIn("only path the audit may modify", read("agents/audit.md").lower())
+
+    def test_agents_do_not_pin_a_router_model(self) -> None:
+        manifest = _load_manifest()
+        for name in ("plan", "test", "build", "review", "audit", "general"):
+            self.assertNotIn("model", manifest[name])
+            self.assertNotIn("9router", read(f"agents/{name}.md").lower())
 
     def test_installers_include_skill_and_audit_contracts(self) -> None:
         installer = read("install.py")

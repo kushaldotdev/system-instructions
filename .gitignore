@@ -11,3 +11,5 @@ __pycache__/
 # OpenCode installer backups
 **/opencode.json.bak-*
 **/opencode.jsonc.bak-*
+
+.pi-subagents/*

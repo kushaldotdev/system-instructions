@@ -1,7 +1,6 @@
 ---
 description: Independent exhaustive review specialist for contracts, lifecycle, concurrency, frontend actions, security, data, operations, or testing
 mode: all
-model: 9router-chatgpt/cx/gpt-5.6-sol
 permission:
   edit:
     "*": deny

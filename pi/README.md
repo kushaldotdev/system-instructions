@@ -1,6 +1,6 @@
 # Pi Agent Harness Environment & Setup Guide
 
-Automated provisioning, on-demand tool-schema sanitization + model sync, and extension catalog for Pi Agent.
+Automated provisioning and extension catalog for Pi Agent.
 Works on **Windows, Linux, and WSL**.
 
 ---
@@ -56,13 +56,11 @@ Pass values with `--env KEY=value` (repeatable) or export them in the shell. The
 | :--- | :--- |
 | key missing | written (placeholder or provided value) |
 | blank (`""`) | **overwritten** (placeholder or provided value) |
-| demo/default placeholder (e.g. the sample 9Router URL) | **replaced** when a real value is provided |
+| demo/default placeholder | **replaced** when a real value is provided |
 | real value | **preserved**, never clobbered — but normalized to quoted form (`KEY="value"`) if it was typed naked |
 
 ```bash
 node setup-pi-agent.js \
-  --env NINE_ROUTER=sk-your-9router-key \
-  --env NINE_ROUTER_BASE_URL=https://your-real-proxy.example.com/v1 \
   --env TAVILY_API_KEY=tvly-your-key \
   --env EXA_API_KEY=sk-exa-... \
   --env BRAVE_API_KEY=...
@@ -73,20 +71,14 @@ node setup-pi-agent.js \
 > Model/provider API keys (ANTHROPIC, OPENAI, GEMINI, DEEPSEEK, ...) are **intentionally not**
 > managed here — configure those via `pi /login` or `~/.pi/agent/auth.json`. This script only
 > manages **tool/extension keys**, so it stays orthogonal to your model access.
->
-> **Exception:** the 9Router proxy key (`NINE_ROUTER`) IS managed here — it's written to
-> `~/.pi/.env` and embedded **raw** (not as a shell command) into `~/.pi/agent/models.json`
-> when `/9router-sync` runs. Raw (non-`!`) values resolve identically on Windows and Linux,
-> so one setup fills the key everywhere.
 
 All keys below are written to `~/.pi/.env` and automatically wired into the configs that use
-them (`web-search.json` readers, agent-browser config, `/9router-sync`). Fill them via
+them (`web-search.json` readers, agent-browser config). Fill them via
 `--env KEY=value`, export in the shell, or edit `~/.pi/.env` directly and re-run:
 
 | Group | Keys | Used by |
 | :--- | :--- | :--- |
 | Web search | `TAVILY_API_KEY`, `BRAVE_API_KEY`, `EXA_API_KEY`, `PARALLEL_API_KEY`, `TINYFISH_API_KEY`, `SEARCH1API_KEY`, `SEARCHINFINITY_API_KEY`, `QUERIT_API_KEY`, `SERPDIVE_API_KEY`, `KAGI_API_KEY`, `OLLAMA_API_KEY`, `SERPBASE_API_KEY`, `ANYSEARCH_API_KEY`, `BRIGHTDATA_API_KEY` (+ `BRIGHTDATA_SERP_ZONE`, `BRIGHTDATA_UNLOCKER_ZONE`), `FIRECRAWL_API_KEY`, `PERPLEXITY_API_KEY` | `pi-web-access` search providers |
-| 9Router proxy | `NINE_ROUTER`, `NINE_ROUTER_BASE_URL` | `/9router-sync` model sync (key embedded **raw** into `models.json` — Windows & Linux safe) |
 | agent-browser providers | `BROWSERLESS_API_KEY`, `BROWSERBASE_API_KEY`, `BROWSER_USE_API_KEY`, `KERNEL_API_KEY` | `agent_browser` cloud providers |
 | agent-browser web search | `EXA_API_KEY`, `BRAVE_API_KEY` (shared) | `agent_browser_web_search` companion |
 
@@ -102,29 +94,6 @@ Skip binary/package installs and only (re)generate config files:
 ```bash
 node setup-pi-agent.js --no-install
 ```
-
----
-
-## 🧹 Removing the old always-on 9Router hook (legacy machines)
-
-Older versions of this repo shipped an extension (`9router-discovery.ts`) that synced models
-**on every Pi launch** via `session_start` hooks. The new setup script migrates this
-automatically (deletes the file + settings entry, installs the on-demand command extension).
-
-If you need to remove the old hook manually **before** re-running setup, use:
-
-```bash
-node remove-9router-hook.js
-```
-
-This deletes both halves of the hook:
-
-1. `~/.pi/agent/extensions/9router-discovery.ts` (the extension file)
-2. the `"extensions/9router-discovery.ts"` entry in the `packages` array of
-   `~/.pi/agent/settings.json` (and project `.pi/settings.json` if present)
-
-It backs up `settings.json` before editing, handles both string and object-form package
-entries, is safe to re-run, and works on Windows / Linux / WSL.
 
 ---
 
@@ -154,9 +123,6 @@ BRIGHTDATA_SERP_ZONE=""
 BRIGHTDATA_UNLOCKER_ZONE=""
 FIRECRAWL_API_KEY=""
 PERPLEXITY_API_KEY=""
-# --- 9Router proxy ---
-NINE_ROUTER="sk-your-9router-key-here"
-NINE_ROUTER_BASE_URL="https://your-real-proxy.example.com/v1"
 # --- agent-browser cloud providers ---
 BROWSERLESS_API_KEY=""
 BROWSERBASE_API_KEY=""
@@ -173,64 +139,9 @@ AGENT_BROWSER_ENCRYPTION_KEY="<64-hex chars, generated>"
   "opencode": {
     "type": "api_key",
     "key": "your-opencode-key"
-  },
-  "9router": {
-    "type": "api_key",
-    "key": "sk-your-9router-key-here"
   }
 }
 ```
-
----
-
-## 🚦 9Router sync + tool-schema sanitizer (`/9router-sync`)
-
-### Why tool schemas needed cleaning
-
-Gemini/Antigravity reject tool schemas carrying internal TypeBox metadata keys
-(`~optional`, `~kind`, `~readonly`) with `HTTP 400: Unknown name "~optional"` errors.
-This affects tools whose schemas are built with `Type.Optional(<raw JSON>)`, e.g.
-`mcpScript.timeoutMs`, `mcp.limit`, `mcp.offset` in `pi-mcp-adapter` — TypeBox marks those
-with an *enumerable* `~optional` key that survives JSON serialization.
-
-> Why `gemini/gemini-3.6-flash` fails but `ag/gemini-3.6-flash-high` seemed to work:
-> both route through the same 9Router proxy to the same strict Gemini/Antigravity backend,
-> and both reject `~optional` identically. The difference was whether `~optional` was present
-> in the tool schemas at request time (e.g. after MCP tools were registered).
-
-### On-demand sanitize + model sync (`/9router-sync`)
-
-The extension registers **no launch-time hooks** — nothing runs at Pi startup. When you run
-`/9router-sync`, it does two things:
-
-1. **Syncs the 9Router model catalog** into `~/.pi/agent/models.json` (raw key, both OSes).
-2. **Sanitizes registered tool schemas in place**, stripping `~optional`/`~kind`/`~readonly`
-   so Gemini requests succeed.
-
-Run it after Pi starts (or after `/reload`), and re-run it if you hit
-`HTTP 400: Unknown name "~optional"` mid-session after MCP tools re-register.
-
-### Manual model catalog sync (`/9router-sync`)
-
-Run the slash command to sync the 9Router model list into `~/.pi/agent/models.json`:
-
-```
-/9router-sync
-```
-
-- Fetches `GET {NINE_ROUTER_BASE_URL}/models` with the `NINE_ROUTER` key from `~/.pi/.env`.
-- Writes the `9router` provider + models into `~/.pi/agent/models.json`
-  (`api: openai-completions`, per-model `reasoning` / `input` / `contextWindow` / `maxTokens`).
-  The provider `apiKey` is the **raw key** (not a `!` shell command), so it resolves
-  identically on Windows and Linux.
-- Also strips `~optional`/`~kind`/`~readonly` from registered tool schemas in place.
-- Reports how many models were synced and how many tool schemas were sanitized.
-
-> [!NOTE]
-> Run `/9router-sync` after Pi starts (or after `/reload`), or any time your 9Router model
-> catalog changes. The tool-schema sanitize step also re-applies the `~optional` fix to
-> currently-registered tools — run it again if you hit `HTTP 400: Unknown name "~optional"`
-> on Gemini mid-session after MCP tools re-register.
 
 ---
 
@@ -264,18 +175,6 @@ Run the slash command to sync the 9Router model list into `~/.pi/agent/models.js
 
 ## 🛠️ Custom Local Extensions
 
-### `9router-sync.ts` (`~/.pi/agent/extensions/9router-sync.ts`)
-
-- **No launch-time hooks**: registers only the `/9router-sync` slash command — nothing runs
-  at Pi startup.
-- **Model sync**: `/9router-sync` fetches the 9Router model catalog into
-  `~/.pi/agent/models.json` (provider `apiKey` written as a **raw key**, Windows/Linux safe)
-  and sanitizes registered tool schemas in place, stripping internal TypeBox metadata keys
-  (`~optional`, `~kind`, `~readonly`) that break Gemini/Antigravity with
-  `HTTP 400: Unknown name "~optional"`.
-- **Reasoning Token Support**: configures provider compatibility options allowing live
-  reasoning token streaming (`reasoning_content`).
-
 > [!NOTE]
 > **Excluded Machine-Specific Extensions**: `herdr-agent-state.ts` is intentionally excluded
 > from `setup-pi-agent.js` and portable provisioners because it is a local host-specific state
@@ -288,11 +187,8 @@ Run the slash command to sync the 9Router model list into `~/.pi/agent/models.js
 | File Path | Description |
 | :--- | :--- |
 | [`pi/setup-pi-agent.js`](file:///home/kushal/projects/system-instructions/pi/setup-pi-agent.js) | Main idempotent Node.js provisioner script (Windows/Linux/WSL). |
-| [`pi/remove-9router-hook.js`](file:///home/kushal/projects/system-instructions/pi/remove-9router-hook.js) | Removes the legacy always-on hook from older machines. |
-| [`~/.pi/.env`](file:///home/kushal/.pi/.env) | Isolated environment variables (web-search, 9Router, agent-browser provider keys — see the managed-keys table above). |
+| [`~/.pi/.env`](file:///home/kushal/.pi/.env) | Isolated environment variables (web-search, agent-browser provider keys — see the managed-keys table above). |
 | [`~/.pi/web-search.json`](file:///home/kushal/.pi/web-search.json) | Configures `web_search` provider routing and fallback resolution; each provider key is a `!node` reader into `~/.pi/.env`, so filling `.env` activates the provider. |
 | [`~/.pi/config/pi-agent-browser-native/config.json`](file:///home/kushal/.pi/config/pi-agent-browser-native/config.json) | agent-browser user config enabling the `agent_browser_web_search` companion (reads EXA/BRAVE keys from `~/.pi/.env`). |
 | [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider API keys. |
 | [`~/.pi/agent/settings.json`](file:///home/kushal/.pi/agent/settings.json) | User preferences, theme, and package manifest. |
-| [`~/.pi/agent/models.json`](file:///home/kushal/.pi/agent/models.json) | Provider registry for 9Router models (written by `/9router-sync`). |
-| [`~/.pi/agent/extensions/9router-sync.ts`](file:///home/kushal/.pi/agent/extensions/9router-sync.ts) | Automatic tool-schema sanitizer + on-demand 9Router model sync extension. |
