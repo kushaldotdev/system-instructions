@@ -19,7 +19,8 @@ WHAT IMPORT DOES (in order)
      so the export copy stays small — no node_modules bloat)
   4. Apply the pi-web-access trim patch (your provider trim, automatic)
   5. Install rtk binary, agent-browser CLI + Chrome for Testing, ffmpeg (as needed)
-  6. Print final steps (auth, keys, /reload)
+  6. Install pi-web (npm install -g @agegr/pi-web@latest — browser UI for pi)
+  7. Print final steps (auth, keys, pi-web launch, /reload)
 
 SYNC / DISABLED-STATE
   - settings.json is copied WHOLESALE, so disabled extensions (e.g.
@@ -319,6 +320,23 @@ def ensure_ffmpeg() -> None:
         print("      Linux/WSL: sudo apt install ffmpeg | macOS: brew install ffmpeg | Windows: winget install ffmpeg")
 
 
+PI_WEB_NPM = "@agegr/pi-web"
+
+
+def ensure_pi_web() -> None:
+    """Install the pi browser UI (pi-web) globally if missing."""
+    if shutil.which("pi-web"):
+        print("[=] pi-web already installed")
+        return
+    print(f"[+] pi-web not found — npm install -g {PI_WEB_NPM}@latest...")
+    res = run(["npm", "install", "-g", f"{PI_WEB_NPM}@latest"], check=False)
+    if res is not None and res.returncode == 0 and shutil.which("pi-web"):
+        print("[+] pi-web installed")
+    else:
+        print(f"  ⚠️  pi-web install failed. Manual: npm install -g {PI_WEB_NPM}@latest")
+        print("      Note: pi-web requires Node.js 22.19.0 or newer.")
+
+
 # ---------------------------------------------------------------------------
 # EXPORT
 # ---------------------------------------------------------------------------
@@ -422,18 +440,27 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
         print(f"error: {src_path} doesn't look like a pi-config-transfer export (no manifest.json)")
         return 2
 
-    with open(manifest_path, encoding="utf-8") as f:
-        manifest = json.load(f)
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        print(f"error: cannot read {manifest_path}")
+        return 2
+
+    items = manifest.get("items", [])
+    if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+        print(f"error: {manifest_path} has no valid items list")
+        return 2
     print(f"Export from {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}")
-    print(f"  {len(manifest.get('items', []))} item(s), secrets={'included' if manifest.get('includeSecrets') else 'NOT included'}\n")
+    print(f"  {len(items)} item(s), secrets={'included' if manifest.get('includeSecrets') else 'NOT included'}\n")
 
     # 1. Ensure pi
     if not no_install:
-        print("=== Step 1/6: pi itself ===")
+        print("=== Step 1/7: pi itself ===")
         ensure_pi()
 
     # 2. Restore config files
-    print("\n=== Step 2/6: config files ===")
+    print("\n=== Step 2/7: config files ===")
     to_apply = []
     for root, dirs, files in os.walk(src_path):
         # skip .git and patch dirs (patch handled separately)
@@ -472,7 +499,7 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
 
     # 3. Install packages (only if not --no-install and not dry-run)
     if not no_install:
-        print("\n=== Step 3/6: packages ===")
+        print("\n=== Step 3/7: packages ===")
         pkgs_path = src_path / "packages.json"
         pkgs = []
         if pkgs_path.exists():
@@ -484,7 +511,7 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
 
     # 4. Apply trim patch
     if not no_install:
-        print("\n=== Step 4/6: pi-web-access trim patch ===")
+        print("\n=== Step 4/7: pi-web-access trim patch ===")
         patch_src = src_path / "patch" / "pi-web-access"
         if patch_src.exists():
             target_dir = AGENT_DIR / PI_WEB_ACCESS_REL
@@ -499,18 +526,24 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
 
     # 5. Binaries (rtk, agent-browser, ffmpeg)
     if not no_install:
-        print("\n=== Step 5/6: binaries ===")
+        print("\n=== Step 5/7: binaries ===")
         ensure_rtk()
         ensure_agent_browser()
         ensure_ffmpeg()
 
-    # 6. Final notes
-    print("\n=== Step 6/6: final notes ===")
+    # 6. pi-web (browser UI)
+    if not no_install:
+        print("\n=== Step 6/7: pi-web ===")
+        ensure_pi_web()
+
+    # 7. Final notes
+    print("\n=== Step 7/7: final notes ===")
     print("  1. Keys/auth NOT copied (by default). To bring them, re-export with --include-secrets.")
     print("  2. Add keys: ~/.pi/web-search.json (tavilyApiKey) and ~/.pi/agent/models.json (apiKey).")
     print("  3. Log in: run 'pi' → /auth (or 'pi auth login') for Codex/OpenAI.")
     print("  4. Run /reload inside pi to load the imported extensions.")
     print("  5. If you DID bring secrets: keys are already in place.")
+    print("  6. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
     print("\n✅ Provisioning complete!")
     return 0
 
@@ -524,15 +557,23 @@ def list_export(src: str) -> int:
     if not manifest_path.exists():
         print(f"error: {src_path} doesn't look like an export (no manifest.json)")
         return 2
-    with open(manifest_path, encoding="utf-8") as f:
-        manifest = json.load(f)
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        print(f"error: cannot read {manifest_path}")
+        return 2
+    items = manifest.get("items", [])
+    if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+        print(f"error: {manifest_path} has no valid items list")
+        return 2
     print(f"Export: {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}")
     print(f"  Secrets included: {manifest.get('includeSecrets', False)}")
     print(f"  Packages ({len(manifest.get('packages', []))}):")
     for p in manifest.get("packages", []):
         print(f"    - {p if isinstance(p, str) else p.get('source')}")
-    print(f"  Items ({len(manifest.get('items', []))}):")
-    for item in manifest.get("items", []):
+    print(f"  Items ({len(items)}):")
+    for item in items:
         print(f"    - {item}")
     return 0
 
@@ -548,7 +589,7 @@ def check_environment() -> int:
     print(f"  web-search.json : {WEB_SEARCH_PATH}")
     print(f"  config dir      : {PI_CONFIG_DIR}")
     print(f"  python cmd      : {'python' if platform.system() == 'Windows' else 'python3'}")
-    for tool in ("git", "pi", "node", "npm", "rtk", "agent-browser", "ffmpeg"):
+    for tool in ("git", "pi", "node", "npm", "rtk", "agent-browser", "ffmpeg", "pi-web"):
         found = shutil.which(tool)
         print(f"  {tool:<14}: {found or 'NOT FOUND'}")
     for name, p in (("agent dir", AGENT_DIR), ("web-search", WEB_SEARCH_PATH), ("config", PI_CONFIG_DIR)):

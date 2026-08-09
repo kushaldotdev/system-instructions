@@ -19,6 +19,7 @@ python3 pi-config-transfer.py export            # -> ./pi-setup-export/ (in cwd)
 ```
 
 This creates a small, portable snapshot containing:
+
 - **Config only** — no `npm/` node_modules tree, no sessions, no auth
 - Your **package list** (14 packages) → reinstalled on the target via `pi install`
 - Your **custom extensions** (web-search-trim, pi-update, subagent, pi-rtk-optimizer, ...)
@@ -44,7 +45,8 @@ export. It does everything, in order:
 | **3. Packages** | `pi install` each package from the exported list (idempotent, keeps disabled-extension filters) |
 | **4. Trim patch** | Applies the pi-web-access provider trim (`openai`, `exa`, `tavily`) |
 | **5. Binaries** | Installs `rtk`, `agent-browser` CLI + Chrome for Testing, warns if `ffmpeg` missing |
-| **6. Final notes** | Auth/keys reminders, `/reload` |
+| **6. pi-web** | Installs `@agegr/pi-web` globally (browser UI for pi, `npm install -g @agegr/pi-web@latest`) |
+| **7. Final notes** | Auth/keys reminders, `pi-web` launch, `/reload` |
 
 > [!NOTE]
 > **API keys & auth are NOT copied by default.** Re-export with `--include-secrets`
@@ -59,7 +61,7 @@ export. It does everything, in order:
 | `python3 pi-config-transfer.py export [dest]` | Create export folder (default `./pi-setup-export/`) |
 | `python3 pi-config-transfer.py export --include-secrets` | Also export API keys (models.json apiKey, tavily key) |
 | `python3 pi-config-transfer.py export --dry-run` | Preview what would be exported |
-| `python3 pi-config-transfer.py import [src]` | **Full provisioning** (6 steps above); defaults to `./pi-setup-export/` |
+| `python3 pi-config-transfer.py import [src]` | **Full provisioning** (7 steps above); defaults to `./pi-setup-export/` |
 | `python3 pi-config-transfer.py import [src] --no-install` | Config files only — skip pi/packages/binaries/patch |
 | `python3 pi-config-transfer.py import [src] --dry-run` | Preview what would be applied |
 | `python3 pi-config-transfer.py list [src]` | Show packages + items inside an export; defaults to `./pi-setup-export/` |
@@ -98,8 +100,8 @@ A best-effort **secret scan** warns if an exported file contains a key-shaped va
 | **`pi-rtk-optimizer`** | RTK command rewriting + tool output compaction (needs the `rtk` binary — auto-installed by import). |
 | **`opencode-pi`** | OpenCode provider integration. |
 
-Plus (from the exported `settings.json`): `cc-safety-net`, `pi-token-speed`,
-`pine-of-glass`, `pi-antigravity-rotator`.
+Plus (from the exported `settings.json`): `pi-token-speed`, `pine-of-glass`,
+`pi-cache-optimizer`, `pi-antigravity`.
 
 ### External binaries handled by import
 
@@ -108,6 +110,7 @@ Plus (from the exported `settings.json`): `cc-safety-net`, `pi-token-speed`,
 | `rtk` (`~/.local/bin/rtk`) | `pi-rtk-optimizer` | ✅ Auto-installs if missing (official installer) |
 | `agent-browser` (npm global) | `pi-agent-browser-native` | ✅ `npm install -g agent-browser` if missing |
 | Chrome for Testing (`~/.agent-browser/browsers/`) | `agent_browser` tool launch | ✅ `agent-browser install` (one-time download) |
+| `pi-web` (npm global) | browser UI for pi (`http://127.0.0.1:30141`) | ✅ `npm install -g @agegr/pi-web@latest` if missing |
 | `ffmpeg` | browser screen recording (`record stop`) | ⚠️ Warning only (apt/brew/winget) |
 
 ---
@@ -146,7 +149,8 @@ extensions added later are picked up automatically on the next export (no code c
    - `~/.pi/web-search.json` → `tavilyApiKey`
    - `~/.pi/agent/models.json` → custom provider `apiKey`
 2. **Log in** for model access: run `pi` → `/auth` (or `pi auth login`).
-3. **`/reload`** inside pi to load the imported extensions.
+3. **Browser UI**: run `pi-web`, then open `http://127.0.0.1:30141` (needs Node ≥ 22.19).
+4. **`/reload`** inside pi to load the imported extensions.
 
 ---
 
