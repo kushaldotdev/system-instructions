@@ -30,8 +30,9 @@ SYNC / DISABLED-STATE
 SECRETS
   - By default NO secrets are exported: auth.json (OAuth tokens), model API keys,
     tavily key — all stripped/omitted.
-  - Pass --include-secrets to export them. The export folder then contains real
-    keys — treat it like a private key.
+  - Pass --include-secrets to export them (including auth.json, the OAuth/login
+    token store). The export folder then contains real keys — treat it like a
+    private key.
 
 USAGE
   export [dest] [--include-secrets] [--dry-run]    (dest defaults to ./pi-setup-export)
@@ -86,10 +87,11 @@ DEFAULT_EXPORT_DIR = "pi-setup-export"
 PI_NPM = "@earendil-works/pi-coding-agent"
 
 # Top-level entries under ~/.pi/agent to sync
+# auth.json (OAuth tokens) is only exported with --include-secrets (see export).
 SYNC_AGENT_ITEMS = [
     "extensions", "settings.json", "models.json", "keybindings.json",
     "AGENTS.md", "SYSTEM.md", "APPEND_SYSTEM.md", "prompts", "themes", "skills", "chains", "config",
-    "profiles",
+    "profiles", "auth.json",
 ]
 
 # Never-sync paths inside a synced item (relative to ~/.pi/agent)
@@ -345,9 +347,14 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
     files = collect_files()
 
     if dry_run:
-        print(f"[dry-run] Would export {len(files)} item(s) to {dest_path}")
-        for rel, _ in files:
+        # Mirror real export: secret paths are only included with --include-secrets
+        shown = [(rel, _) for rel, _ in files if not (is_secret_path(rel) and not include_secrets)]
+        print(f"[dry-run] Would export {len(shown)} item(s) to {dest_path}")
+        for rel, _ in shown:
             print(f"  + {rel}")
+        skipped = [rel for rel, _ in files if is_secret_path(rel) and not include_secrets]
+        if skipped:
+            print(f"  ⚠️  Skipped (secret, use --include-secrets): {', '.join(skipped)}")
         # Show packages + patch too
         pkgs = package_sources()
         print(f"\n  package list ({len(pkgs)}):")
@@ -382,6 +389,10 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, target)
         copied.append(rel)
+        # auth.json is only copied when --include-secrets was passed, so its
+        # secret-shaped values are expected — don't warn about them.
+        if include_secrets and rel == "auth.json":
+            continue
         if src.suffix in (".json", ".jsonc", ".md", ".txt", ".ts", ".js"):
             hits = secret_scan(target)
             if hits:
@@ -407,10 +418,10 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
             warnings.append(f"trim patch source missing: {fname} (pi-web-access not installed?)")
 
     manifest = {
-        "tool": "pi-config-transfer", "version": "2.0.0",
+        "tool": "pi-config-transfer", "version": "2.1.0",
         "exportedAt": __import__("datetime").datetime.now().isoformat(),
         "hostname": hostname(), "includeSecrets": include_secrets,
-        "items": [r for r, _ in files],
+        "items": [r for r, _ in files if not (is_secret_path(r) and not include_secrets)],
         "packages": pkgs,
         "patch": [f"patch/pi-web-access/{f}" for f in TRIM_PATCH_FILES],
     }
@@ -538,12 +549,19 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
 
     # 7. Final notes
     print("\n=== Step 7/7: final notes ===")
-    print("  1. Keys/auth NOT copied (by default). To bring them, re-export with --include-secrets.")
-    print("  2. Add keys: ~/.pi/web-search.json (tavilyApiKey) and ~/.pi/agent/models.json (apiKey).")
-    print("  3. Log in: run 'pi' → /auth (or 'pi auth login') for Codex/OpenAI.")
-    print("  4. Run /reload inside pi to load the imported extensions.")
-    print("  5. If you DID bring secrets: keys are already in place.")
-    print("  6. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
+    if manifest.get("includeSecrets"):
+        print("  1. Secrets INCLUDED in this export: auth.json (login tokens), web-search.json,")
+        print("     models.json apiKeys were copied as-is.")
+        print("  2. You should already be logged in (auth.json restored) — verify with 'pi auth status'.")
+        print("  3. Run /reload inside pi to load the imported extensions.")
+        print("  4. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
+    else:
+        print("  1. Keys/auth NOT copied (by default). To bring them, re-export with --include-secrets.")
+        print("     auth.json (OAuth/login tokens) is now included with --include-secrets too.")
+        print("  2. Add keys: ~/.pi/web-search.json (tavilyApiKey) and ~/.pi/agent/models.json (apiKey).")
+        print("  3. Log in: run 'pi' → /auth (or 'pi auth login') for Codex/OpenAI.")
+        print("  4. Run /reload inside pi to load the imported extensions.")
+        print("  5. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
     print("\n✅ Provisioning complete!")
     return 0
 

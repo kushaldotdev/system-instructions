@@ -50,7 +50,8 @@ export. It does everything, in order:
 
 > [!NOTE]
 > **API keys & auth are NOT copied by default.** Re-export with `--include-secrets`
-> if you want them, and treat that export like a private key.
+> if you want them — that now includes `auth.json` (your login tokens), so the new
+> machine is logged in too. Treat such an export like a private key.
 
 ---
 
@@ -59,7 +60,7 @@ export. It does everything, in order:
 | Command | Purpose |
 | :--- | :--- |
 | `python3 pi-config-transfer.py export [dest]` | Create export folder (default `./pi-setup-export/`) |
-| `python3 pi-config-transfer.py export --include-secrets` | Also export API keys (models.json apiKey, tavily key) |
+| `python3 pi-config-transfer.py export --include-secrets` | Also export API keys + auth.json (models.json apiKey, tavily key, login tokens) |
 | `python3 pi-config-transfer.py export --dry-run` | Preview what would be exported |
 | `python3 pi-config-transfer.py import [src]` | **Full provisioning** (7 steps above); defaults to `./pi-setup-export/` |
 | `python3 pi-config-transfer.py import [src] --no-install` | Config files only — skip pi/packages/binaries/patch |
@@ -73,7 +74,7 @@ export. It does everything, in order:
 
 | Item | Default behavior |
 | :--- | :--- |
-| `auth.json` (Codex/OpenAI OAuth tokens) | **Never exported** — re-login per machine (`pi auth login`) |
+| `auth.json` (Codex/OpenAI OAuth tokens) | **Included only with `--include-secrets`** — otherwise re-login per machine (`pi auth login`) |
 | `tavilyApiKey` (web-search.json) | **Stripped** → `***REDACTED***` unless `--include-secrets` |
 | `models.json` `apiKey` (custom provider keys) | **Stripped** → `***REDACTED***` unless `--include-secrets` |
 | `npm/`, `bin/`, `git/`, `sessions/`, `missions/` | **Never exported** — packages reinstalled from the list |
@@ -139,7 +140,7 @@ extensions added later are picked up automatically on the next export (no code c
 | [`~/.pi/agent/models.json`](file:///home/kushal/.pi/agent/models.json) | Custom provider definitions (apiKey stripped on export). |
 | [`~/.pi/web-search.json`](file:///home/kushal/.pi/web-search.json) | web_search provider routing + fallback config (key stripped on export). |
 | [`~/.pi/config/pi-agent-browser-native/config.json`](file:///home/kushal/.pi/config/pi-agent-browser-native/config.json) | agent-browser user config. |
-| [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider logins (never exported). |
+| [`~/.pi/agent/auth.json`](file:///home/kushal/.pi/agent/auth.json) | Token store for provider logins (exported only with `--include-secrets`). |
 
 ---
 
@@ -148,7 +149,8 @@ extensions added later are picked up automatically on the next export (no code c
 1. **Re-add keys** if you didn't use `--include-secrets`:
    - `~/.pi/web-search.json` → `tavilyApiKey`
    - `~/.pi/agent/models.json` → custom provider `apiKey`
-2. **Log in** for model access: run `pi` → `/auth` (or `pi auth login`).
+2. **Log in** for model access: run `pi` → `/auth` (or `pi auth login`). If you DID
+   use `--include-secrets`, auth.json was restored and you should already be logged in.
 3. **Browser UI**: run `pi-web`, then open `http://127.0.0.1:30141` (needs Node ≥ 22.19).
 4. **`/reload`** inside pi to load the imported extensions.
 
