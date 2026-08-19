@@ -15,7 +15,7 @@ without copying API keys or auth tokens.
 ### On your main machine — export your setup
 
 ```bash
-python3 pi-config-transfer.py export            # -> ./pi-setup-export/ (in cwd)
+python3 pi/pi-config-transfer.py export            # -> ./pi-setup-export/ (in cwd)
 ```
 
 This creates a small, portable snapshot containing:
@@ -31,7 +31,7 @@ This creates a small, portable snapshot containing:
 ### On the new machine — provision in one command
 
 ```bash
-python3 pi-config-transfer.py import
+python3 pi/pi-config-transfer.py import
 ```
 
 That's it. Import looks for `./pi-setup-export/` by default (the same default folder
@@ -59,14 +59,14 @@ export. It does everything, in order:
 
 | Command | Purpose |
 | :--- | :--- |
-| `python3 pi-config-transfer.py export [dest]` | Create export folder (default `./pi-setup-export/`) |
-| `python3 pi-config-transfer.py export --include-secrets` | Also export API keys + auth.json (models.json apiKey, tavily key, login tokens) |
-| `python3 pi-config-transfer.py export --dry-run` | Preview what would be exported |
-| `python3 pi-config-transfer.py import [src]` | **Full provisioning** (7 steps above); defaults to `./pi-setup-export/` |
-| `python3 pi-config-transfer.py import [src] --no-install` | Config files only — skip pi/packages/binaries/patch |
-| `python3 pi-config-transfer.py import [src] --dry-run` | Preview what would be applied |
-| `python3 pi-config-transfer.py list [src]` | Show packages + items inside an export; defaults to `./pi-setup-export/` |
-| `python3 pi-config-transfer.py check` | Show environment info (platform, paths, tool availability) |
+| `python3 pi/pi-config-transfer.py export [dest]` | Create export folder (default `./pi-setup-export/`) |
+| `python3 pi/pi-config-transfer.py export --include-secrets` | Also export API keys + auth.json (models.json apiKey, tavily key, login tokens) |
+| `python3 pi/pi-config-transfer.py export --dry-run` | Preview what would be exported |
+| `python3 pi/pi-config-transfer.py import [src]` | **Full provisioning** (7 steps above); defaults to `./pi-setup-export/` |
+| `python3 pi/pi-config-transfer.py import [src] --no-install` | Config files only — skip pi/packages/binaries/patch |
+| `python3 pi/pi-config-transfer.py import [src] --dry-run` | Preview what would be applied |
+| `python3 pi/pi-config-transfer.py list [src]` | Show packages + items inside an export; defaults to `./pi-setup-export/` |
+| `python3 pi/pi-config-transfer.py check` | Show environment info (platform, paths, tool availability) |
 
 ---
 

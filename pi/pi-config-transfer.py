@@ -51,6 +51,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 # ---------------------------------------------------------------------------
 # Paths (mirror pi's own resolution; cross-platform)
 # ---------------------------------------------------------------------------
@@ -89,31 +90,85 @@ PI_NPM = "@earendil-works/pi-coding-agent"
 # Top-level entries under ~/.pi/agent to sync
 # auth.json (OAuth tokens) is only exported with --include-secrets (see export).
 SYNC_AGENT_ITEMS = [
-    "extensions", "settings.json", "models.json", "keybindings.json",
-    "AGENTS.md", "SYSTEM.md", "APPEND_SYSTEM.md", "prompts", "themes", "skills", "chains", "config",
-    "profiles", "auth.json",
+    "extensions",
+    "settings.json",
+    "models.json",
+    "keybindings.json",
+    "AGENTS.md",
+    "SYSTEM.md",
+    "APPEND_SYSTEM.md",
+    "prompts",
+    "themes",
+    "skills",
+    "chains",
+    "config",
+    "profiles",
+    "auth.json",
 ]
 
 # Never-sync paths inside a synced item (relative to ~/.pi/agent)
 NEVER_SYNC_SUB = [
-    "sessions", "state", "missions", "run-history.jsonl", "models-store.json",
-    "npm", "bin", "git", "node_modules", ".git",
+    "sessions",
+    "state",
+    "missions",
+    "run-history.jsonl",
+    "models-store.json",
+    "npm",
+    "bin",
+    "git",
+    "node_modules",
+    ".git",
 ]
 
-NEVER_SYNC_GLOB = ("*.log", "*.bak", "*.tmp", "*.swp", ".DS_Store", "__pycache__", "*.pyc")
+NEVER_SYNC_GLOB = (
+    "*.log",
+    "*.bak",
+    "*.tmp",
+    "*.swp",
+    ".DS_Store",
+    "__pycache__",
+    "*.pyc",
+)
 
 SECRET_HINTS = (
-    "auth", "token", "secret", "credential", "apikey", "api_key",
-    "password", "passwd", ".env", "private_key", "key.json", "cookie",
+    "auth",
+    "token",
+    "secret",
+    "credential",
+    "apikey",
+    "api_key",
+    "password",
+    "passwd",
+    ".env",
+    "private_key",
+    "key.json",
+    "cookie",
 )
 
 SECRET_JSON_FIELDS = {
-    "apiKey", "api_key", "apikey", "tavilyApiKey", "openaiApiKey",
-    "braveApiKey", "exaApiKey", "geminiApiKey", "perplexityApiKey",
-    "jinaApiKey", "kagiApiKey", "serpdiveApiKey", "search1apiApiKey",
-    "searchinfinityApiKey", "queritApiKey", "tinyfishApiKey",
-    "parallelApiKey", "ollamaApiKey", "cloudflareApiKey", "searxngBaseUrl",
-    "access", "refresh", "headers",
+    "apiKey",
+    "api_key",
+    "apikey",
+    "tavilyApiKey",
+    "openaiApiKey",
+    "braveApiKey",
+    "exaApiKey",
+    "geminiApiKey",
+    "perplexityApiKey",
+    "jinaApiKey",
+    "kagiApiKey",
+    "serpdiveApiKey",
+    "search1apiApiKey",
+    "searchinfinityApiKey",
+    "queritApiKey",
+    "tinyfishApiKey",
+    "parallelApiKey",
+    "ollamaApiKey",
+    "cloudflareApiKey",
+    "searxngBaseUrl",
+    "access",
+    "refresh",
+    "headers",
 }
 
 # pi-web-access trim patch: the 2 files we patch to keep only openai/exa/tavily
@@ -136,6 +191,7 @@ def secret_scan(path: Path) -> list:
     except OSError:
         return found
     import re
+
     value_pat = re.compile(
         r'("[^"]*(?:api|key|token|secret|password)[^"]*"|\w*[Kk]ey\w*)\s*[:=]\s*"([^"]{12,})"'
     )
@@ -216,7 +272,7 @@ def resolve_src(rel: str) -> Path:
     if rel == "web-search.json":
         return WEB_SEARCH_PATH
     if rel.startswith("config/"):
-        return PI_CONFIG_DIR / rel[len("config/"):]
+        return PI_CONFIG_DIR / rel[len("config/") :]
     return AGENT_DIR / rel
 
 
@@ -224,7 +280,7 @@ def resolve_target(rel: str) -> Path:
     if rel == "web-search.json":
         return WEB_SEARCH_PATH
     if rel.startswith("config/"):
-        return PI_CONFIG_DIR / rel[len("config/"):]
+        return PI_CONFIG_DIR / rel[len("config/") :]
     return AGENT_DIR / rel
 
 
@@ -258,7 +314,9 @@ def ensure_pi() -> None:
     if res is not None and res.returncode == 0 and is_pi_installed():
         print("[+] pi installed")
     else:
-        raise RuntimeError("Could not install pi. Manual: npm install -g @earendil-works/pi-coding-agent")
+        raise RuntimeError(
+            "Could not install pi. Manual: npm install -g @earendil-works/pi-coding-agent"
+        )
 
 
 def pi_install_packages(packages: list) -> None:
@@ -275,6 +333,12 @@ def pi_install_packages(packages: list) -> None:
         res = run(["pi", "install", source], check=False)
         if res is not None and res.returncode != 0:
             print(f"    ⚠️  failed to install {source}")
+    npm_dir = AGENT_DIR / "npm"
+    if npm_dir.exists():
+        run(
+            ["npm", "install", "--legacy-peer-deps", "--prefix", str(npm_dir)],
+            check=False,
+        )
 
 
 def ensure_rtk() -> None:
@@ -282,11 +346,20 @@ def ensure_rtk() -> None:
         print("[=] rtk already installed")
         return
     print("[+] rtk not found — installing (official installer)...")
-    res = run(["bash", "-lc", "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"], check=False)
+    res = run(
+        [
+            "bash",
+            "-lc",
+            "curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh",
+        ],
+        check=False,
+    )
     if res is not None and res.returncode == 0 and shutil.which("rtk"):
         print("[+] rtk installed")
     else:
-        print("  ⚠️  rtk install failed. Manual: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh")
+        print(
+            "  ⚠️  rtk install failed. Manual: curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh"
+        )
 
 
 def ensure_agent_browser() -> None:
@@ -296,30 +369,43 @@ def ensure_agent_browser() -> None:
         print("[+] agent-browser CLI not found — npm install -g agent-browser...")
         res = run(["npm", "install", "-g", "agent-browser"], check=False)
         if res is None or res.returncode != 0:
-            print("  ⚠️  agent-browser CLI install failed. Manual: npm install -g agent-browser")
+            print(
+                "  ⚠️  agent-browser CLI install failed. Manual: npm install -g agent-browser"
+            )
             return
         print("[+] agent-browser CLI installed")
 
     # Chrome for Testing
     browsers_dir = Path.home() / ".agent-browser" / "browsers"
-    chrome_present = browsers_dir.exists() and any(
-        e.name.startswith("chrome-") for e in browsers_dir.iterdir()
-    ) if browsers_dir.exists() else False
+    chrome_present = (
+        browsers_dir.exists()
+        and any(e.name.startswith("chrome-") for e in browsers_dir.iterdir())
+        if browsers_dir.exists()
+        else False
+    )
     if chrome_present:
         print("[=] Chrome for Testing already present")
     else:
-        print("[+] Chrome for Testing missing — running 'agent-browser install' (one-time download)...")
+        print(
+            "[+] Chrome for Testing missing — running 'agent-browser install' (one-time download)..."
+        )
         res = run(["agent-browser", "install"], check=False)
         if res is None or res.returncode != 0:
-            print("  ⚠️  'agent-browser install' failed. On Linux/WSL you may need:\n      sudo agent-browser install --with-deps")
+            print(
+                "  ⚠️  'agent-browser install' failed. On Linux/WSL you may need:\n      sudo agent-browser install --with-deps"
+            )
 
 
 def ensure_ffmpeg() -> None:
     if shutil.which("ffmpeg"):
         print("[=] ffmpeg available")
     else:
-        print("  ⚠️  ffmpeg not found — browser screen recording ('record stop') needs it.")
-        print("      Linux/WSL: sudo apt install ffmpeg | macOS: brew install ffmpeg | Windows: winget install ffmpeg")
+        print(
+            "  ⚠️  ffmpeg not found — browser screen recording ('record stop') needs it."
+        )
+        print(
+            "      Linux/WSL: sudo apt install ffmpeg | macOS: brew install ffmpeg | Windows: winget install ffmpeg"
+        )
 
 
 PI_WEB_NPM = "@agegr/pi-web"
@@ -348,11 +434,17 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
 
     if dry_run:
         # Mirror real export: secret paths are only included with --include-secrets
-        shown = [(rel, _) for rel, _ in files if not (is_secret_path(rel) and not include_secrets)]
+        shown = [
+            (rel, _)
+            for rel, _ in files
+            if not (is_secret_path(rel) and not include_secrets)
+        ]
         print(f"[dry-run] Would export {len(shown)} item(s) to {dest_path}")
         for rel, _ in shown:
             print(f"  + {rel}")
-        skipped = [rel for rel, _ in files if is_secret_path(rel) and not include_secrets]
+        skipped = [
+            rel for rel, _ in files if is_secret_path(rel) and not include_secrets
+        ]
         if skipped:
             print(f"  ⚠️  Skipped (secret, use --include-secrets): {', '.join(skipped)}")
         # Show packages + patch too
@@ -377,7 +469,11 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
             if not include_secrets:
                 skipped_secret.append(rel)
                 continue
-        if not include_secrets and src.suffix == ".json" and rel in ("web-search.json", "models.json"):
+        if (
+            not include_secrets
+            and src.suffix == ".json"
+            and rel in ("web-search.json", "models.json")
+        ):
             try:
                 strip_secrets_from_json(src, dest_path / rel)
             except ValueError as e:
@@ -396,12 +492,15 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
         if src.suffix in (".json", ".jsonc", ".md", ".txt", ".ts", ".js"):
             hits = secret_scan(target)
             if hits:
-                warnings.append(f"{rel}: possible secret at line(s) {', '.join(str(h) for h in [x[0] for x in hits])}")
+                warnings.append(
+                    f"{rel}: possible secret at line(s) {', '.join(str(h) for h in [x[0] for x in hits])}"
+                )
 
     # Package list (for import to pi install) — always exported
     pkgs = package_sources()
     (dest_path / "packages.json").write_text(
-        json.dumps({"packages": pkgs}, indent=2) + "\n", encoding="utf-8")
+        json.dumps({"packages": pkgs}, indent=2) + "\n", encoding="utf-8"
+    )
 
     # Trim patch (pi-web-access) — always exported, so import can re-apply
     patch_dir = dest_path / "patch" / "pi-web-access"
@@ -415,23 +514,35 @@ def export_config(dest: str, include_secrets: bool, dry_run: bool) -> int:
                 shutil.copy2(bak, patch_dir / (fname + ".bak"))
             copied.append(f"patch/pi-web-access/{fname}")
         else:
-            warnings.append(f"trim patch source missing: {fname} (pi-web-access not installed?)")
+            warnings.append(
+                f"trim patch source missing: {fname} (pi-web-access not installed?)"
+            )
 
     manifest = {
-        "tool": "pi-config-transfer", "version": "2.1.0",
+        "tool": "pi-config-transfer",
+        "version": "2.1.0",
         "exportedAt": __import__("datetime").datetime.now().isoformat(),
-        "hostname": hostname(), "includeSecrets": include_secrets,
-        "items": [r for r, _ in files if not (is_secret_path(r) and not include_secrets)],
+        "hostname": hostname(),
+        "includeSecrets": include_secrets,
+        "items": [
+            r for r, _ in files if not (is_secret_path(r) and not include_secrets)
+        ],
         "packages": pkgs,
         "patch": [f"patch/pi-web-access/{f}" for f in TRIM_PATCH_FILES],
     }
-    (dest_path / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (dest_path / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
 
-    print(f"✅ Exported {len(copied)} item(s) + {len(pkgs)} package(s) + trim patch → {dest_path}")
+    print(
+        f"✅ Exported {len(copied)} item(s) + {len(pkgs)} package(s) + trim patch → {dest_path}"
+    )
     for c in copied:
         print(f"  + {c}")
     if skipped_secret:
-        print(f"\n⚠️  Skipped (secret, use --include-secrets to bring): {', '.join(skipped_secret)}")
+        print(
+            f"\n⚠️  Skipped (secret, use --include-secrets to bring): {', '.join(skipped_secret)}"
+        )
     if warnings:
         print("\n⚠️  Warnings:")
         for w in warnings:
@@ -448,7 +559,9 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
     src_path = Path(src).expanduser()
     manifest_path = src_path / "manifest.json"
     if not src_path.is_dir() or not manifest_path.exists():
-        print(f"error: {src_path} doesn't look like a pi-config-transfer export (no manifest.json)")
+        print(
+            f"error: {src_path} doesn't look like a pi-config-transfer export (no manifest.json)"
+        )
         return 2
 
     try:
@@ -462,8 +575,12 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
     if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
         print(f"error: {manifest_path} has no valid items list")
         return 2
-    print(f"Export from {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}")
-    print(f"  {len(items)} item(s), secrets={'included' if manifest.get('includeSecrets') else 'NOT included'}\n")
+    print(
+        f"Export from {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}"
+    )
+    print(
+        f"  {len(items)} item(s), secrets={'included' if manifest.get('includeSecrets') else 'NOT included'}\n"
+    )
 
     # 1. Ensure pi
     if not no_install:
@@ -515,7 +632,9 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
         pkgs = []
         if pkgs_path.exists():
             try:
-                pkgs = json.loads(pkgs_path.read_text(encoding="utf-8")).get("packages", [])
+                pkgs = json.loads(pkgs_path.read_text(encoding="utf-8")).get(
+                    "packages", []
+                )
             except (OSError, json.JSONDecodeError):
                 pass
         pi_install_packages(pkgs)
@@ -550,15 +669,25 @@ def import_config(src: str, dry_run: bool, no_install: bool) -> int:
     # 7. Final notes
     print("\n=== Step 7/7: final notes ===")
     if manifest.get("includeSecrets"):
-        print("  1. Secrets INCLUDED in this export: auth.json (login tokens), web-search.json,")
+        print(
+            "  1. Secrets INCLUDED in this export: auth.json (login tokens), web-search.json,"
+        )
         print("     models.json apiKeys were copied as-is.")
-        print("  2. You should already be logged in (auth.json restored) — verify with 'pi auth status'.")
+        print(
+            "  2. You should already be logged in (auth.json restored) — verify with 'pi auth status'."
+        )
         print("  3. Run /reload inside pi to load the imported extensions.")
         print("  4. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
     else:
-        print("  1. Keys/auth NOT copied (by default). To bring them, re-export with --include-secrets.")
-        print("     auth.json (OAuth/login tokens) is now included with --include-secrets too.")
-        print("  2. Add keys: ~/.pi/web-search.json (tavilyApiKey) and ~/.pi/agent/models.json (apiKey).")
+        print(
+            "  1. Keys/auth NOT copied (by default). To bring them, re-export with --include-secrets."
+        )
+        print(
+            "     auth.json (OAuth/login tokens) is now included with --include-secrets too."
+        )
+        print(
+            "  2. Add keys: ~/.pi/web-search.json (tavilyApiKey) and ~/.pi/agent/models.json (apiKey)."
+        )
         print("  3. Log in: run 'pi' → /auth (or 'pi auth login') for Codex/OpenAI.")
         print("  4. Run /reload inside pi to load the imported extensions.")
         print("  5. Browser UI: run 'pi-web' then open http://127.0.0.1:30141")
@@ -585,7 +714,9 @@ def list_export(src: str) -> int:
     if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
         print(f"error: {manifest_path} has no valid items list")
         return 2
-    print(f"Export: {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}")
+    print(
+        f"Export: {manifest.get('hostname', '?')} @ {manifest.get('exportedAt', '?')}"
+    )
     print(f"  Secrets included: {manifest.get('includeSecrets', False)}")
     print(f"  Packages ({len(manifest.get('packages', []))}):")
     for p in manifest.get("packages", []):
@@ -598,19 +729,37 @@ def list_export(src: str) -> int:
 
 def check_environment() -> int:
     import platform
+
     print("=== pi-config-transfer environment check ===")
-    print(f"  Platform        : {platform.system()} {platform.release()} ({platform.machine()})")
+    print(
+        f"  Platform        : {platform.system()} {platform.release()} ({platform.machine()})"
+    )
     print(f"  Python          : {platform.python_version()}")
     if os.environ.get("WSL_DISTRO_NAME"):
         print(f"  WSL             : yes ({os.environ.get('WSL_DISTRO_NAME')})")
     print(f"  Agent dir       : {AGENT_DIR}")
     print(f"  web-search.json : {WEB_SEARCH_PATH}")
     print(f"  config dir      : {PI_CONFIG_DIR}")
-    print(f"  python cmd      : {'python' if platform.system() == 'Windows' else 'python3'}")
-    for tool in ("git", "pi", "node", "npm", "rtk", "agent-browser", "ffmpeg", "pi-web"):
+    print(
+        f"  python cmd      : {'python' if platform.system() == 'Windows' else 'python3'}"
+    )
+    for tool in (
+        "git",
+        "pi",
+        "node",
+        "npm",
+        "rtk",
+        "agent-browser",
+        "ffmpeg",
+        "pi-web",
+    ):
         found = shutil.which(tool)
         print(f"  {tool:<14}: {found or 'NOT FOUND'}")
-    for name, p in (("agent dir", AGENT_DIR), ("web-search", WEB_SEARCH_PATH), ("config", PI_CONFIG_DIR)):
+    for name, p in (
+        ("agent dir", AGENT_DIR),
+        ("web-search", WEB_SEARCH_PATH),
+        ("config", PI_CONFIG_DIR),
+    ):
         print(f"  {'exists ' + name:<20}: {'yes' if p.exists() else 'no'}")
     return 0
 
@@ -628,14 +777,26 @@ def main():
     p_export.add_argument("--dry-run", action="store_true")
 
     p_import = sub.add_parser("import", help="provision a machine from an export")
-    p_import.add_argument("src", nargs="?", default=DEFAULT_EXPORT_DIR,
-                          help=f"source export folder (default: {DEFAULT_EXPORT_DIR}/ in current dir)")
-    p_import.add_argument("--no-install", action="store_true", help="config only, skip pi/packages/binaries")
+    p_import.add_argument(
+        "src",
+        nargs="?",
+        default=DEFAULT_EXPORT_DIR,
+        help=f"source export folder (default: {DEFAULT_EXPORT_DIR}/ in current dir)",
+    )
+    p_import.add_argument(
+        "--no-install",
+        action="store_true",
+        help="config only, skip pi/packages/binaries",
+    )
     p_import.add_argument("--dry-run", action="store_true")
 
     p_list = sub.add_parser("list", help="inspect an export folder")
-    p_list.add_argument("src", nargs="?", default=DEFAULT_EXPORT_DIR,
-                        help=f"source export folder (default: {DEFAULT_EXPORT_DIR}/ in current dir)")
+    p_list.add_argument(
+        "src",
+        nargs="?",
+        default=DEFAULT_EXPORT_DIR,
+        help=f"source export folder (default: {DEFAULT_EXPORT_DIR}/ in current dir)",
+    )
     sub.add_parser("check", help="show environment/platform info")
 
     args = parser.parse_args()
