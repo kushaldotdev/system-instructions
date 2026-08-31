@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "keep": [
+    "openai",
+    "exa",
+    "tavily"
+  ]
+}
