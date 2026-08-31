@@ -1,0 +1,12 @@
+{
+  "defaultSubagentContext": "fresh",
+  "toolDescriptionMode": "compact",
+  "inlineToolDisplay": "rich",
+  "asyncByDefault": true,
+  "forceTopLevelAsync": true,
+  "artifactDir": "session",
+  "singleRunOutputBaseDir": "~/.pi/agent/subagent-outputs",
+  "scheduledRuns": {
+    "storeRoot": "~/.pi/agent/schedules"
+  }
+}
