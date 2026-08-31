@@ -1,6 +1,5 @@
 {
   "defaultSubagentContext": "fresh",
-  "toolDescriptionMode": "compact",
   "inlineToolDisplay": "rich",
   "asyncByDefault": true,
   "forceTopLevelAsync": true,
