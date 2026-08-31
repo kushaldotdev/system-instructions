@@ -16,3 +16,5 @@ __pycache__/
 **/pi-setup-export/
 
 .pi-subagents/*
+
+pi-setup-export.zip
