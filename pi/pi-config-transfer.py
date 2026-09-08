@@ -83,7 +83,8 @@ AGENT_DIR = agent_dir()
 WEB_SEARCH_PATH = web_search_path()
 PI_CONFIG_DIR = AGENT_DIR.parent / "config"
 BACKUP_SUFFIX = ".pi-transfer.bak"
-DEFAULT_EXPORT_DIR = "pi-setup-export"
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_EXPORT_DIR = str(SCRIPT_DIR / "pi-setup-export")
 
 PI_NPM = "@earendil-works/pi-coding-agent"
 
@@ -103,6 +104,11 @@ SYNC_AGENT_ITEMS = [
     "chains",
     "config",
     "profiles",
+    "agents",
+    "pi-fff.json",
+    "caveman.json",
+    "cockpit.json",
+    "subagent-extensions",
     "auth.json",
 ]
 
